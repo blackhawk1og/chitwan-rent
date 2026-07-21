@@ -1,3 +1,5 @@
+import MapShell from "./components/MapShell.jsx";
+
 export default function App() {
-  return <div className="w-screen h-screen bg-bg" />;
+  return <MapShell />;
 }

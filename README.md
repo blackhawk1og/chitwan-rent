@@ -78,7 +78,7 @@ should return a JSON array of ~180 seeded flat objects.
 ## Feature checklist (Phases 0–9)
 
 - [x] Phase 0 — Scaffold & data foundation
-- [ ] Phase 1 — App shell & map base
+- [x] Phase 1 — App shell & map base
 - [ ] Phase 2 — Available flats + cluster badges + detail card
 - [ ] Phase 3 — Search + filter
 - [ ] Phase 4 — List My Flat
