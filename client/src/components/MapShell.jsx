@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker } from "react-leaflet";
-import { Compass, MoreHorizontal, KeyRound, Search } from "lucide-react";
+import { Compass, KeyRound, Search, Ruler } from "lucide-react";
 import {
   CHITWAN_CENTER,
   DEFAULT_ZOOM,
@@ -22,12 +22,11 @@ import { useCreateToletSpot } from "../hooks/useCreateToletSpot.js";
 import { usePinDropFlow } from "../hooks/usePinDropFlow.js";
 import { formatRs, bhkLabel } from "../lib/format.js";
 import { DEFAULT_FILTERS, countActiveFilters } from "../lib/filters.js";
-import { createDotIcon } from "../lib/mapIcons.jsx";
+import { createDotIcon, createHandleIcon } from "../lib/mapIcons.jsx";
 import TopNavPill from "./TopNavPill.jsx";
 import SearchBar from "./SearchBar.jsx";
 import IconStack from "./IconStack.jsx";
-import OnboardingModal from "./OnboardingModal.jsx";
-import StubModal from "./StubModal.jsx";
+import OnboardingModal, { isOnboardingDismissed } from "./OnboardingModal.jsx";
 import FilterModal from "./FilterModal.jsx";
 import FlatsLayer from "./FlatsLayer.jsx";
 import SeekersLayer from "./SeekersLayer.jsx";
@@ -44,6 +43,9 @@ import DropSeekerPinForm from "./DropSeekerPinForm.jsx";
 import SpotToLetModal from "./SpotToLetModal.jsx";
 import SuperheroesModal from "./SuperheroesModal.jsx";
 import SuperheroesPage from "./SuperheroesPage.jsx";
+import MoreModal from "./MoreModal.jsx";
+import AreaRectangleLayer from "./AreaRectangleLayer.jsx";
+import AreaStatsResultsModal from "./AreaStatsResultsModal.jsx";
 
 const HOW_TO_USE_STEPS = [
   "Browse available flats and flatmate-seeker pins on the map",
@@ -65,8 +67,15 @@ const FIND_A_FLAT_STEPS = [
   "We'll match you with available flats AND people looking for flatmates nearby. Whatever fits, you'll get an email.",
 ];
 
+const AREA_STATS_STEPS = [
+  "Tap to set your first corner",
+  "Tap again to set the opposite corner",
+  "Adjust the box, then tap View Stats →",
+];
+
 const draftFlatIcon = createDotIcon(KeyRound, { bg: "#7c3aed", size: 32 });
 const draftSeekerIcon = createDotIcon(Search, { bg: "#14b8a6", size: 32 });
+const areaCornerIcon = createHandleIcon();
 
 export default function MapShell() {
   const location = useLocation();
@@ -113,7 +122,16 @@ export default function MapShell() {
   const [toletLocation, setToletLocation] = useState(null);
   const [toletPicking, setToletPicking] = useState(false);
 
-  const pushDown = listFlatFlow.step === "pin-drop" || findFlatFlow.step === "pin-drop" || toletPicking;
+  const [pinsHidden, setPinsHidden] = useState(false);
+
+  // Area Stats: 'onboarding' -> 'drawing' (2 taps) -> 'adjusting' (drag corners) -> 'results'
+  const [areaStatsStep, setAreaStatsStep] = useState(null);
+  const [areaDrawCorner1, setAreaDrawCorner1] = useState(null);
+  const [areaBounds, setAreaBounds] = useState(null); // { north, south, east, west }
+  const [areaStatsType, setAreaStatsType] = useState("all");
+
+  const areaStatsDrawing = areaStatsStep === "drawing" || areaStatsStep === "adjusting";
+  const pushDown = listFlatFlow.step === "pin-drop" || findFlatFlow.step === "pin-drop" || toletPicking || areaStatsDrawing;
 
   const displayedFlats = useMemo(() => {
     if (!justSubmittedFlats.length) return flats;
@@ -249,6 +267,75 @@ export default function MapShell() {
     }
   };
 
+  const handleLocateMe = () => {
+    closeQuickModal();
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition((pos) => {
+      mapRef.current?.flyTo([pos.coords.latitude, pos.coords.longitude], 15, { duration: 1.2 });
+    });
+  };
+
+  const handleToggleHidePins = () => {
+    setPinsHidden((v) => !v);
+    closeQuickModal();
+  };
+
+  const resetAreaStatsFlow = () => {
+    setAreaStatsStep(null);
+    setAreaDrawCorner1(null);
+    setAreaBounds(null);
+    setAreaStatsType("all");
+  };
+
+  const handleOpenAreaStats = () => {
+    closeQuickModal();
+    setAreaDrawCorner1(null);
+    setAreaBounds(null);
+    setAreaStatsType("all");
+    setAreaStatsStep(isOnboardingDismissed("area-stats") ? "drawing" : "onboarding");
+  };
+
+  const handleAreaMapClick = (latlng) => {
+    if (!areaDrawCorner1) {
+      setAreaDrawCorner1(latlng);
+      return;
+    }
+    const north = Math.max(areaDrawCorner1.lat, latlng.lat);
+    const south = Math.min(areaDrawCorner1.lat, latlng.lat);
+    const east = Math.max(areaDrawCorner1.lng, latlng.lng);
+    const west = Math.min(areaDrawCorner1.lng, latlng.lng);
+    setAreaBounds({ north, south, east, west });
+    setAreaDrawCorner1(null);
+    setAreaStatsStep("adjusting");
+  };
+
+  const handleAreaCornerDrag = (cornerKey, newLatLng) => {
+    setAreaBounds((prev) => {
+      const anchors = {
+        nw: { lat: prev.south, lng: prev.east },
+        ne: { lat: prev.south, lng: prev.west },
+        sw: { lat: prev.north, lng: prev.east },
+        se: { lat: prev.north, lng: prev.west },
+      };
+      const anchor = anchors[cornerKey];
+      return {
+        north: Math.max(anchor.lat, newLatLng.lat),
+        south: Math.min(anchor.lat, newLatLng.lat),
+        east: Math.max(anchor.lng, newLatLng.lng),
+        west: Math.min(anchor.lng, newLatLng.lng),
+      };
+    });
+  };
+
+  const areaStatsBannerText =
+    areaStatsStep === "drawing"
+      ? areaDrawCorner1
+        ? "📐 Tap again to set the opposite corner"
+        : "📐 Tap to set your first corner"
+      : areaStatsStep === "adjusting"
+      ? "📐 Adjust corners or view stats"
+      : null;
+
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-bg">
       <MapContainer
@@ -264,14 +351,26 @@ export default function MapShell() {
           <TileLayer key="dark" url={DARK_TILE_URL} attribution={DARK_TILE_ATTRIBUTION} />
         )}
 
-        <FlatsLayer flats={displayedFlats} onSelect={(flat) => setSelectedItem({ type: "flat", data: flat })} />
-        <SeekersLayer
-          seekerPins={displayedSeekerPins}
-          onSelect={(seeker) => setSelectedItem({ type: "seeker", data: seeker })}
-        />
-        <ToletSpotsLayer spots={displayedToletSpots} />
+        {!pinsHidden && (
+          <>
+            <FlatsLayer flats={displayedFlats} onSelect={(flat) => setSelectedItem({ type: "flat", data: flat })} />
+            <SeekersLayer
+              seekerPins={displayedSeekerPins}
+              onSelect={(seeker) => setSelectedItem({ type: "seeker", data: seeker })}
+            />
+            <ToletSpotsLayer spots={displayedToletSpots} />
+            {schoolsOn && <PoisLayer pois={schoolPois} />}
+          </>
+        )}
         {busRoutesOn && <BusRoutesLayer routes={busRoutes} />}
-        {schoolsOn && <PoisLayer pois={schoolPois} />}
+
+        {areaStatsStep === "drawing" && <PinDropCatcher onPlace={handleAreaMapClick} />}
+        {areaStatsStep === "drawing" && areaDrawCorner1 && (
+          <Marker position={[areaDrawCorner1.lat, areaDrawCorner1.lng]} icon={areaCornerIcon} />
+        )}
+        {areaStatsStep === "adjusting" && areaBounds && (
+          <AreaRectangleLayer bounds={areaBounds} onCornerDrag={handleAreaCornerDrag} />
+        )}
 
         {toletPicking && <PinDropCatcher onPlace={handlePlaceToletPin} />}
 
@@ -436,12 +535,49 @@ export default function MapShell() {
       )}
 
       {quickModal === "more" && (
-        <StubModal
+        <MoreModal
           onClose={closeQuickModal}
-          icon={MoreHorizontal}
-          title="More tools"
-          subtitle="Locate me, hide pins, and area stats."
-          phaseNote="These tools arrive in Phase 8."
+          onLocateMe={handleLocateMe}
+          onToggleHidePins={handleToggleHidePins}
+          pinsHidden={pinsHidden}
+          onAreaStats={handleOpenAreaStats}
+        />
+      )}
+
+      {areaStatsStep === "onboarding" && (
+        <OnboardingModal
+          onClose={resetAreaStatsFlow}
+          onCta={() => setAreaStatsStep("drawing")}
+          dontShowAgainKey="area-stats"
+          icon={Ruler}
+          title="Area Stats"
+          subtitle="Draw any area on the map and instantly see rent breakdowns by BHK — for that specific neighbourhood, not the whole city."
+          steps={AREA_STATS_STEPS}
+          note="Toggle between All / Gated / Not Gated to compare inside the modal."
+          ctaLabel="Got it"
+        />
+      )}
+
+      {areaStatsDrawing && (
+        <PinDropBanner text={areaStatsBannerText} accent="purple" onCancel={resetAreaStatsFlow} />
+      )}
+
+      {areaStatsStep === "adjusting" && (
+        <button
+          type="button"
+          onClick={() => setAreaStatsStep("results")}
+          className="pointer-events-auto fixed bottom-8 left-1/2 z-[1600] -translate-x-1/2 rounded-full bg-accent-purple px-6 py-3 text-sm font-bold text-white shadow-2xl transition hover:bg-accent-purple-light"
+        >
+          View Stats →
+        </button>
+      )}
+
+      {areaStatsStep === "results" && areaBounds && (
+        <AreaStatsResultsModal
+          bounds={areaBounds}
+          type={areaStatsType}
+          onTypeChange={setAreaStatsType}
+          onClose={resetAreaStatsFlow}
         />
       )}
 

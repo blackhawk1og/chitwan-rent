@@ -114,3 +114,26 @@ export function createLabeledPoiIcon(IconComponent, label, { bg = "#38bdf8" } = 
     iconAnchor: [10, 10],
   });
 }
+
+// White circular drag handle for the Area Stats rectangle's corners.
+export function createHandleIcon() {
+  const html = renderToStaticMarkup(
+    <div
+      style={{
+        width: 16,
+        height: 16,
+        borderRadius: "9999px",
+        background: "#ffffff",
+        border: "2px solid #7c3aed",
+        boxShadow: "0 2px 6px rgba(0,0,0,0.5)",
+      }}
+    />
+  );
+
+  return L.divIcon({
+    html,
+    className: "chitwan-pin-icon",
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
+}

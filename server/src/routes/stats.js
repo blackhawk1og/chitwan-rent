@@ -43,4 +43,59 @@ router.get("/nearby", async (req, res) => {
   }
 });
 
+function average(values) {
+  return values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : null;
+}
+
+function buildBucket(label, rents) {
+  if (!rents.length) return { bhk: label, count: 0, avg: null, min: null, max: null };
+  return { bhk: label, count: rents.length, avg: average(rents), min: Math.min(...rents), max: Math.max(...rents) };
+}
+
+// GET /api/stats/area?bbox=lat1,lng1,lat2,lng2&type=all|gated|not_gated
+// Avg/min/max rent per BHK bucket among available flats inside the box.
+router.get("/area", async (req, res) => {
+  const { bbox, type } = req.query;
+  const coords = (bbox || "").split(",").map(Number);
+
+  if (coords.length !== 4 || coords.some(Number.isNaN)) {
+    return res.status(400).json({ error: "bbox required as lat1,lng1,lat2,lng2" });
+  }
+  const [lat1, lng1, lat2, lng2] = coords;
+  const minLat = Math.min(lat1, lat2);
+  const maxLat = Math.max(lat1, lat2);
+  const minLng = Math.min(lng1, lng2);
+  const maxLng = Math.max(lng1, lng2);
+
+  const conditions = ["status = 'available'", "lat BETWEEN $1 AND $2", "lng BETWEEN $3 AND $4"];
+  const params = [minLat, maxLat, minLng, maxLng];
+  if (type === "gated" || type === "not_gated") {
+    params.push(type);
+    conditions.push(`gated = $${params.length}`);
+  }
+
+  try {
+    const result = await query(
+      `SELECT bhk, rent FROM flats WHERE ${conditions.join(" AND ")}`,
+      params
+    );
+    const rows = result.rows;
+    const allRents = rows.map((r) => r.rent);
+
+    const buckets = [1, 2, 3, 4].map((bhk) =>
+      buildBucket(bhk, rows.filter((r) => r.bhk === bhk).map((r) => r.rent))
+    );
+    buckets.push(buildBucket("5+", rows.filter((r) => r.bhk >= 5).map((r) => r.rent)));
+
+    res.json({
+      count: rows.length,
+      overallAvg: average(allRents),
+      buckets,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to compute area stats" });
+  }
+});
+
 export default router;
