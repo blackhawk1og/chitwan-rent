@@ -30,3 +30,18 @@ body {
 .chitwan-cluster-icon {
   cursor: pointer;
 }
+
+.leaflet-popup-content-wrapper {
+  background: #151626;
+  color: #f5f5f7;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.leaflet-popup-tip {
+  background: #151626;
+}
+
+.leaflet-popup-close-button {
+  color: #9ca3af !important;
+}

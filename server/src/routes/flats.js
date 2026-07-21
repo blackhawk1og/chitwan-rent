@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { query } from "../db.js";
+import { isNearAnyRoute } from "../lib/geo.js";
 
 const router = Router();
 
@@ -9,14 +10,74 @@ const SELECT_WITH_OWNER = `
   LEFT JOIN users u ON u.id = f.owner_id
 `;
 
-// GET /api/flats?status=available
+// GET /api/flats?status=available&bhk=1,2,5&rent_min=&rent_max=&area=&furnishing=&gated=&posted_within=30&near_bus_route=true
 router.get("/", async (req, res) => {
-  const { status } = req.query;
+  const {
+    status, bhk, rent_min, rent_max, area, furnishing, gated, posted_within, near_bus_route,
+  } = req.query;
+
+  const conditions = [];
+  const params = [];
+
+  if (status) {
+    params.push(status);
+    conditions.push(`f.status = $${params.length}`);
+  }
+
+  if (bhk) {
+    const values = bhk.split(",").map(Number).filter((n) => !Number.isNaN(n));
+    const exact = values.filter((n) => n < 5);
+    const hasFivePlus = values.includes(5);
+    const bhkConditions = [];
+    if (exact.length) {
+      params.push(exact);
+      bhkConditions.push(`f.bhk = ANY($${params.length})`);
+    }
+    if (hasFivePlus) bhkConditions.push(`f.bhk >= 5`);
+    if (bhkConditions.length) conditions.push(`(${bhkConditions.join(" OR ")})`);
+  }
+
+  if (rent_min) {
+    params.push(Number(rent_min));
+    conditions.push(`f.rent >= $${params.length}`);
+  }
+  if (rent_max) {
+    params.push(Number(rent_max));
+    conditions.push(`f.rent <= $${params.length}`);
+  }
+
+  if (area && area !== "all") {
+    params.push(area);
+    conditions.push(`f.area = $${params.length}`);
+  }
+
+  if (furnishing) {
+    params.push(furnishing);
+    conditions.push(`f.furnishing = $${params.length}`);
+  }
+
+  if (gated) {
+    params.push(gated);
+    conditions.push(`f.gated = $${params.length}`);
+  }
+
+  if (posted_within) {
+    params.push(Number(posted_within));
+    conditions.push(`f.posted_at >= now() - ($${params.length} || ' days')::interval`);
+  }
+
+  const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
   try {
-    const result = status
-      ? await query(`${SELECT_WITH_OWNER} WHERE f.status = $1 ORDER BY f.posted_at DESC`, [status])
-      : await query(`${SELECT_WITH_OWNER} ORDER BY f.posted_at DESC`);
-    res.json(result.rows);
+    const result = await query(`${SELECT_WITH_OWNER} ${whereClause} ORDER BY f.posted_at DESC`, params);
+    let rows = result.rows;
+
+    if (near_bus_route === "true") {
+      const routesResult = await query("SELECT geojson FROM bus_routes");
+      rows = rows.filter((f) => isNearAnyRoute(f.lat, f.lng, routesResult.rows));
+    }
+
+    res.json(rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch flats" });

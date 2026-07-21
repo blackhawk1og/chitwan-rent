@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer } from "react-leaflet";
-import { Compass, Camera, MoreHorizontal, KeyRound, Search, Award, SlidersHorizontal } from "lucide-react";
+import { Compass, Camera, MoreHorizontal, KeyRound, Search, Award } from "lucide-react";
 import {
   CHITWAN_CENTER,
   DEFAULT_ZOOM,
@@ -12,14 +12,19 @@ import {
 } from "../lib/mapConfig.js";
 import { useFlats } from "../hooks/useFlats.js";
 import { useSeekerPins } from "../hooks/useSeekerPins.js";
+import { useAreas } from "../hooks/useAreas.js";
+import { useToletSpots } from "../hooks/useToletSpots.js";
 import { formatRs, bhkLabel } from "../lib/format.js";
+import { DEFAULT_FILTERS, countActiveFilters } from "../lib/filters.js";
 import TopNavPill from "./TopNavPill.jsx";
 import SearchBar from "./SearchBar.jsx";
 import IconStack from "./IconStack.jsx";
 import OnboardingModal from "./OnboardingModal.jsx";
 import StubModal from "./StubModal.jsx";
+import FilterModal from "./FilterModal.jsx";
 import FlatsLayer from "./FlatsLayer.jsx";
 import SeekersLayer from "./SeekersLayer.jsx";
+import ToletSpotsLayer from "./ToletSpotsLayer.jsx";
 import ListingChip from "./ListingChip.jsx";
 import FlatDetailCard from "./FlatDetailCard.jsx";
 import SeekerDetailCard from "./SeekerDetailCard.jsx";
@@ -34,6 +39,7 @@ const HOW_TO_USE_STEPS = [
 export default function MapShell() {
   const location = useLocation();
   const navigate = useNavigate();
+  const mapRef = useRef(null);
 
   const [searchValue, setSearchValue] = useState("");
   const [quickModal, setQuickModal] = useState(null); // 'spot-a-tolet' | 'more' | 'filters' | null
@@ -42,8 +48,13 @@ export default function MapShell() {
   const [busRoutesOn, setBusRoutesOn] = useState(false);
   const [greenCoverOn, setGreenCoverOn] = useState(false);
 
-  const { data: flats = [] } = useFlats("available");
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const filterCount = countActiveFilters(filters);
+
+  const { data: flats = [] } = useFlats(filters);
   const { data: seekerPins = [] } = useSeekerPins();
+  const { data: areas = [] } = useAreas();
+  const { data: toletSpots = [] } = useToletSpots(filters.showToletBoards);
 
   const [selectedItem, setSelectedItem] = useState(null); // { type: 'flat'|'seeker', data } | null
   const [expandedItem, setExpandedItem] = useState(null); // same shape, drives the full detail card
@@ -51,9 +62,14 @@ export default function MapShell() {
   const closeRouteModal = () => navigate("/");
   const closeQuickModal = () => setQuickModal(null);
 
+  const handleSelectLocation = (suggestion) => {
+    mapRef.current?.flyTo([suggestion.lat, suggestion.lng], 15, { duration: 1.2 });
+  };
+
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-bg">
       <MapContainer
+        ref={mapRef}
         center={CHITWAN_CENTER}
         zoom={DEFAULT_ZOOM}
         zoomControl={false}
@@ -70,6 +86,7 @@ export default function MapShell() {
           seekerPins={seekerPins}
           onSelect={(seeker) => setSelectedItem({ type: "seeker", data: seeker })}
         />
+        {filters.showToletBoards && <ToletSpotsLayer spots={toletSpots} />}
       </MapContainer>
 
       {greenCoverOn && (
@@ -84,8 +101,10 @@ export default function MapShell() {
           <SearchBar
             value={searchValue}
             onChange={setSearchValue}
+            areas={areas}
+            onSelectLocation={handleSelectLocation}
             onFilterClick={() => setQuickModal("filters")}
-            filterCount={0}
+            filterCount={filterCount}
           />
         </div>
         <div className="pointer-events-auto">
@@ -163,12 +182,10 @@ export default function MapShell() {
       )}
 
       {quickModal === "filters" && (
-        <StubModal
+        <FilterModal
+          initialFilters={filters}
+          onApply={setFilters}
           onClose={closeQuickModal}
-          icon={SlidersHorizontal}
-          title="Filters"
-          subtitle="Customize the way you see chitwan.rent."
-          phaseNote="The full filter modal arrives in Phase 3."
         />
       )}
 

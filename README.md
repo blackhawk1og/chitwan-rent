@@ -80,7 +80,7 @@ should return a JSON array of ~180 seeded flat objects.
 - [x] Phase 0 — Scaffold & data foundation
 - [x] Phase 1 — App shell & map base
 - [x] Phase 2 — Available flats + cluster badges + detail card
-- [ ] Phase 3 — Search + filter
+- [x] Phase 3 — Search + filter
 - [ ] Phase 4 — List My Flat
 - [ ] Phase 5 — Find a Flat
 - [ ] Phase 6 — Spot a To-Let + Superheroes

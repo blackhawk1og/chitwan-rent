@@ -3,6 +3,8 @@ import express from "express";
 import cors from "cors";
 import flatsRouter from "./routes/flats.js";
 import seekerPinsRouter from "./routes/seekerPins.js";
+import areasRouter from "./routes/areas.js";
+import toletSpotsRouter from "./routes/toletSpots.js";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -16,6 +18,8 @@ app.get("/api/health", (req, res) => {
 
 app.use("/api/flats", flatsRouter);
 app.use("/api/seeker-pins", seekerPinsRouter);
+app.use("/api/areas", areasRouter);
+app.use("/api/tolet-spots", toletSpotsRouter);
 
 app.listen(PORT, () => {
   console.log(`API server listening on http://localhost:${PORT}`);
