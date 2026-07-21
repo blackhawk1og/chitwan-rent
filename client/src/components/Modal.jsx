@@ -7,7 +7,7 @@ export default function Modal({ onClose, children, maxWidthClass = "max-w-md" })
       onClick={onClose}
     >
       <div
-        className={`relative w-full ${maxWidthClass} rounded-3xl border border-white/10 bg-surface p-6 shadow-2xl`}
+        className={`relative max-h-[85vh] w-full ${maxWidthClass} overflow-y-auto rounded-3xl border border-white/10 bg-surface p-6 shadow-2xl`}
         onClick={(e) => e.stopPropagation()}
       >
         <button

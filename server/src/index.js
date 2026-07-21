@@ -5,6 +5,7 @@ import flatsRouter from "./routes/flats.js";
 import seekerPinsRouter from "./routes/seekerPins.js";
 import areasRouter from "./routes/areas.js";
 import toletSpotsRouter from "./routes/toletSpots.js";
+import statsRouter from "./routes/stats.js";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -20,6 +21,7 @@ app.use("/api/flats", flatsRouter);
 app.use("/api/seeker-pins", seekerPinsRouter);
 app.use("/api/areas", areasRouter);
 app.use("/api/tolet-spots", toletSpotsRouter);
+app.use("/api/stats", statsRouter);
 
 app.listen(PORT, () => {
   console.log(`API server listening on http://localhost:${PORT}`);

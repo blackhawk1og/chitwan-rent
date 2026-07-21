@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker } from "react-leaflet";
 import { Compass, Camera, MoreHorizontal, KeyRound, Search, Award } from "lucide-react";
@@ -15,14 +15,15 @@ import { useSeekerPins } from "../hooks/useSeekerPins.js";
 import { useAreas } from "../hooks/useAreas.js";
 import { useToletSpots } from "../hooks/useToletSpots.js";
 import { useCreateFlat } from "../hooks/useCreateFlat.js";
+import { useCreateSeekerPin } from "../hooks/useCreateSeekerPin.js";
+import { usePinDropFlow } from "../hooks/usePinDropFlow.js";
 import { formatRs, bhkLabel } from "../lib/format.js";
 import { DEFAULT_FILTERS, countActiveFilters } from "../lib/filters.js";
-import { reverseGeocodeArea } from "../lib/geocode.js";
 import { createDotIcon } from "../lib/mapIcons.jsx";
 import TopNavPill from "./TopNavPill.jsx";
 import SearchBar from "./SearchBar.jsx";
 import IconStack from "./IconStack.jsx";
-import OnboardingModal, { isOnboardingDismissed } from "./OnboardingModal.jsx";
+import OnboardingModal from "./OnboardingModal.jsx";
 import StubModal from "./StubModal.jsx";
 import FilterModal from "./FilterModal.jsx";
 import FlatsLayer from "./FlatsLayer.jsx";
@@ -34,6 +35,7 @@ import SeekerDetailCard from "./SeekerDetailCard.jsx";
 import PinDropBanner from "./PinDropBanner.jsx";
 import PinDropCatcher from "./PinDropCatcher.jsx";
 import AddFlatForm from "./AddFlatForm.jsx";
+import DropSeekerPinForm from "./DropSeekerPinForm.jsx";
 
 const HOW_TO_USE_STEPS = [
   "Browse available flats and flatmate-seeker pins on the map",
@@ -49,7 +51,14 @@ const LIST_MY_FLAT_STEPS = [
   "We'll email you when seekers match",
 ];
 
+const FIND_A_FLAT_STEPS = [
+  "Drop a pin where you want to live",
+  "Tell us your budget and what you're looking for — a whole flat or a room",
+  "We'll match you with available flats AND people looking for flatmates nearby. Whatever fits, you'll get an email.",
+];
+
 const draftFlatIcon = createDotIcon(KeyRound, { bg: "#7c3aed", size: 32 });
+const draftSeekerIcon = createDotIcon(Search, { bg: "#14b8a6", size: 32 });
 
 export default function MapShell() {
   const location = useLocation();
@@ -74,27 +83,26 @@ export default function MapShell() {
   const [selectedItem, setSelectedItem] = useState(null); // { type: 'flat'|'seeker', data } | null
   const [expandedItem, setExpandedItem] = useState(null); // same shape, drives the full detail card
 
-  // List My Flat flow: 'onboarding' -> 'pin-drop' -> 'form'
-  const [listFlatStep, setListFlatStep] = useState(null);
-  const [draftFlatPin, setDraftFlatPin] = useState(null); // { lat, lng, area }
   const [justSubmittedFlats, setJustSubmittedFlats] = useState([]);
+  const [justSubmittedSeekerPins, setJustSubmittedSeekerPins] = useState([]);
   const createFlat = useCreateFlat();
+  const createSeekerPin = useCreateSeekerPin();
 
-  useEffect(() => {
-    if (location.pathname === "/list-my-flat") {
-      setListFlatStep(isOnboardingDismissed("list-my-flat") ? "pin-drop" : "onboarding");
-      setDraftFlatPin(null);
-    } else {
-      setListFlatStep(null);
-      setDraftFlatPin(null);
-    }
-  }, [location.pathname]);
+  const listFlatFlow = usePinDropFlow({ routePath: "/list-my-flat", onboardingKey: "list-my-flat", areas });
+  const findFlatFlow = usePinDropFlow({ routePath: "/find-a-flat", onboardingKey: "find-a-flat", areas });
+  const pushDown = listFlatFlow.step === "pin-drop" || findFlatFlow.step === "pin-drop";
 
   const displayedFlats = useMemo(() => {
     if (!justSubmittedFlats.length) return flats;
     const existingIds = new Set(flats.map((f) => f.id));
     return [...flats, ...justSubmittedFlats.filter((f) => !existingIds.has(f.id))];
   }, [flats, justSubmittedFlats]);
+
+  const displayedSeekerPins = useMemo(() => {
+    if (!justSubmittedSeekerPins.length) return seekerPins;
+    const existingIds = new Set(seekerPins.map((s) => s.id));
+    return [...seekerPins, ...justSubmittedSeekerPins.filter((s) => !existingIds.has(s.id))];
+  }, [seekerPins, justSubmittedSeekerPins]);
 
   const closeRouteModal = () => navigate("/");
   const closeQuickModal = () => setQuickModal(null);
@@ -103,28 +111,8 @@ export default function MapShell() {
     mapRef.current?.flyTo([suggestion.lat, suggestion.lng], 15, { duration: 1.2 });
   };
 
-  const handlePlaceFlatPin = async (latlng) => {
-    const { lat, lng } = latlng;
-    setDraftFlatPin({ lat, lng, area: null });
-    setListFlatStep("form");
-    const area = await reverseGeocodeArea(lat, lng, areas);
-    setDraftFlatPin((p) => (p && p.lat === lat && p.lng === lng ? { ...p, area } : p));
-  };
-
-  const handleDragFlatPin = async (latlng) => {
-    const { lat, lng } = latlng;
-    setDraftFlatPin({ lat, lng, area: null });
-    const area = await reverseGeocodeArea(lat, lng, areas);
-    setDraftFlatPin((p) => (p && p.lat === lat && p.lng === lng ? { ...p, area } : p));
-  };
-
-  const handleCancelFlatForm = () => {
-    setDraftFlatPin(null);
-    setListFlatStep("pin-drop");
-  };
-
   const handleSubmitFlatForm = async (form) => {
-    if (!draftFlatPin) return;
+    if (!listFlatFlow.draftPin) return;
     try {
       const created = await createFlat.mutateAsync({
         listing_type: "flat",
@@ -140,18 +128,46 @@ export default function MapShell() {
         sqft: form.sqft === "" ? null : Number(form.sqft),
         one_liner: form.oneLiner || null,
         email: form.email || null,
-        lat: draftFlatPin.lat,
-        lng: draftFlatPin.lng,
-        area: draftFlatPin.area,
+        lat: listFlatFlow.draftPin.lat,
+        lng: listFlatFlow.draftPin.lng,
+        area: listFlatFlow.draftPin.area,
         photos: [],
       });
       setJustSubmittedFlats((prev) => [...prev, created]);
       mapRef.current?.flyTo([created.lat, created.lng], 16, { duration: 1 });
-      setListFlatStep(null);
-      setDraftFlatPin(null);
+      listFlatFlow.finish();
       navigate("/");
     } catch {
       // error surfaced via createFlat.isError in the form
+    }
+  };
+
+  const handleSubmitSeekerForm = async (form) => {
+    if (!findFlatFlow.draftPin) return;
+    try {
+      const created = await createSeekerPin.mutateAsync({
+        looking_for: form.lookingFor,
+        budget: Number(form.budget),
+        bhk_pref: form.bhkPref,
+        move_in: form.moveIn,
+        food_pref: form.foodPref,
+        smoker_ok: form.smokerOk,
+        gender: form.gender,
+        flatmate_gender_pref: form.flatmateGenderPref,
+        parking_required: form.parkingRequired,
+        lifestyle_note: form.lifestyleNote || null,
+        email: form.email,
+        phone: form.phone,
+        lat: findFlatFlow.draftPin.lat,
+        lng: findFlatFlow.draftPin.lng,
+        area: findFlatFlow.draftPin.area,
+      });
+      setJustSubmittedSeekerPins((prev) => [...prev, created]);
+      mapRef.current?.flyTo([created.lat, created.lng], 16, { duration: 1 });
+      findFlatFlow.finish();
+      navigate("/");
+    } catch {
+      // error surfaced via createSeekerPin.isError in the form
     }
   };
 
@@ -172,18 +188,28 @@ export default function MapShell() {
 
         <FlatsLayer flats={displayedFlats} onSelect={(flat) => setSelectedItem({ type: "flat", data: flat })} />
         <SeekersLayer
-          seekerPins={seekerPins}
+          seekerPins={displayedSeekerPins}
           onSelect={(seeker) => setSelectedItem({ type: "seeker", data: seeker })}
         />
         {filters.showToletBoards && <ToletSpotsLayer spots={toletSpots} />}
 
-        {listFlatStep === "pin-drop" && <PinDropCatcher onPlace={handlePlaceFlatPin} />}
-        {listFlatStep === "form" && draftFlatPin && (
+        {listFlatFlow.step === "pin-drop" && <PinDropCatcher onPlace={listFlatFlow.placePin} />}
+        {listFlatFlow.step === "form" && listFlatFlow.draftPin && (
           <Marker
-            position={[draftFlatPin.lat, draftFlatPin.lng]}
+            position={[listFlatFlow.draftPin.lat, listFlatFlow.draftPin.lng]}
             icon={draftFlatIcon}
             draggable
-            eventHandlers={{ dragend: (e) => handleDragFlatPin(e.target.getLatLng()) }}
+            eventHandlers={{ dragend: (e) => listFlatFlow.dragPin(e.target.getLatLng()) }}
+          />
+        )}
+
+        {findFlatFlow.step === "pin-drop" && <PinDropCatcher onPlace={findFlatFlow.placePin} />}
+        {findFlatFlow.step === "form" && findFlatFlow.draftPin && (
+          <Marker
+            position={[findFlatFlow.draftPin.lat, findFlatFlow.draftPin.lng]}
+            icon={draftSeekerIcon}
+            draggable
+            eventHandlers={{ dragend: (e) => findFlatFlow.dragPin(e.target.getLatLng()) }}
           />
         )}
       </MapContainer>
@@ -194,7 +220,7 @@ export default function MapShell() {
 
       <div className="pointer-events-none absolute inset-0 z-[1000]">
         <div className="pointer-events-auto">
-          <TopNavPill pushDown={listFlatStep === "pin-drop"} />
+          <TopNavPill pushDown={pushDown} />
         </div>
         <div className="pointer-events-auto">
           <SearchBar
@@ -204,7 +230,7 @@ export default function MapShell() {
             onSelectLocation={handleSelectLocation}
             onFilterClick={() => setQuickModal("filters")}
             filterCount={filterCount}
-            pushDown={listFlatStep === "pin-drop"}
+            pushDown={pushDown}
           />
         </div>
         <div className="pointer-events-auto">
@@ -231,10 +257,10 @@ export default function MapShell() {
         />
       )}
 
-      {listFlatStep === "onboarding" && (
+      {listFlatFlow.step === "onboarding" && (
         <OnboardingModal
           onClose={closeRouteModal}
-          onCta={() => setListFlatStep("pin-drop")}
+          onCta={() => listFlatFlow.setStep("pin-drop")}
           dontShowAgainKey="list-my-flat"
           icon={KeyRound}
           title="Here's how it works"
@@ -242,7 +268,7 @@ export default function MapShell() {
         />
       )}
 
-      {listFlatStep === "pin-drop" && (
+      {listFlatFlow.step === "pin-drop" && (
         <PinDropBanner
           text="👆 Tap your flat's location on the map to place your pin"
           accent="purple"
@@ -250,23 +276,43 @@ export default function MapShell() {
         />
       )}
 
-      {listFlatStep === "form" && draftFlatPin && (
+      {listFlatFlow.step === "form" && listFlatFlow.draftPin && (
         <AddFlatForm
-          onCancel={handleCancelFlatForm}
+          onCancel={listFlatFlow.cancelForm}
           onSubmit={handleSubmitFlatForm}
           submitting={createFlat.isPending}
           submitError={createFlat.isError ? "Something went wrong — please try again." : null}
-          area={draftFlatPin.area}
+          area={listFlatFlow.draftPin.area}
         />
       )}
 
-      {location.pathname === "/find-a-flat" && (
-        <StubModal
+      {findFlatFlow.step === "onboarding" && (
+        <OnboardingModal
           onClose={closeRouteModal}
+          onCta={() => findFlatFlow.setStep("pin-drop")}
+          dontShowAgainKey="find-a-flat"
           icon={Search}
-          title="Find a Flat"
-          subtitle="Drop a seeker pin and get matched with flats and flatmates nearby."
-          phaseNote="The full pin-drop and seeker flow arrives in Phase 5."
+          title="Here's how it works"
+          steps={FIND_A_FLAT_STEPS}
+        />
+      )}
+
+      {findFlatFlow.step === "pin-drop" && (
+        <PinDropBanner
+          text="👆 Tap anywhere on the map to place your pin"
+          accent="teal"
+          onCancel={closeRouteModal}
+        />
+      )}
+
+      {findFlatFlow.step === "form" && findFlatFlow.draftPin && (
+        <DropSeekerPinForm
+          lat={findFlatFlow.draftPin.lat}
+          lng={findFlatFlow.draftPin.lng}
+          onCancel={findFlatFlow.cancelForm}
+          onSubmit={handleSubmitSeekerForm}
+          submitting={createSeekerPin.isPending}
+          submitError={createSeekerPin.isError ? "Something went wrong — please try again." : null}
         />
       )}
 
