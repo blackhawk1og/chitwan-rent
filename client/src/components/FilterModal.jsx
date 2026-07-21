@@ -2,6 +2,9 @@ import { useState } from "react";
 import { Sofa, Box, ShieldCheck, ShieldOff, Mail, Bus, ChevronDown } from "lucide-react";
 import Modal from "./Modal.jsx";
 import Switch from "./Switch.jsx";
+import Pill from "./ui/Pill.jsx";
+import ToggleButton from "./ui/ToggleButton.jsx";
+import SectionLabel from "./ui/SectionLabel.jsx";
 import { useAreas } from "../hooks/useAreas.js";
 import { DEFAULT_FILTERS } from "../lib/filters.js";
 
@@ -20,43 +23,6 @@ const POSTED_WITHIN_OPTIONS = [
   { value: "180", label: "180 days" },
   { value: "all", label: "All" },
 ];
-
-function SectionLabel({ children }) {
-  return <div className="mb-2.5 text-xs font-bold uppercase tracking-wide text-text-muted">{children}</div>;
-}
-
-function Pill({ active, onClick, children }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
-        active
-          ? "border-accent-purple bg-accent-purple text-white"
-          : "border-white/10 bg-surface-alt text-text-primary hover:bg-white/5"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function ToggleButton({ active, onClick, icon: Icon, children }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${
-        active
-          ? "border-accent-purple bg-accent-purple text-white"
-          : "border-white/10 bg-surface-alt text-text-primary hover:bg-white/5"
-      }`}
-    >
-      {Icon && <Icon size={15} />}
-      {children}
-    </button>
-  );
-}
 
 export default function FilterModal({ initialFilters, onApply, onClose }) {
   const [draft, setDraft] = useState(initialFilters);

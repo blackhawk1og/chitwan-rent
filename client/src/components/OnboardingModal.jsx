@@ -28,7 +28,7 @@ export default function OnboardingModal({
 
   const handleDontShowAgain = () => {
     dismissOnboarding(dontShowAgainKey);
-    onClose();
+    handleCta();
   };
 
   return (

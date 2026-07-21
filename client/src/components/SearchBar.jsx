@@ -21,7 +21,15 @@ async function searchNominatim(q) {
   }));
 }
 
-export default function SearchBar({ value, onChange, areas = [], onSelectLocation, onFilterClick, filterCount = 0 }) {
+export default function SearchBar({
+  value,
+  onChange,
+  areas = [],
+  onSelectLocation,
+  onFilterClick,
+  filterCount = 0,
+  pushDown = false,
+}) {
   const [focused, setFocused] = useState(false);
   const [nominatimResults, setNominatimResults] = useState([]);
   const [loadingNominatim, setLoadingNominatim] = useState(false);
@@ -65,7 +73,7 @@ export default function SearchBar({ value, onChange, areas = [], onSelectLocatio
   };
 
   return (
-    <div className="absolute left-4 top-4 flex items-start gap-2">
+    <div className={`absolute left-4 flex items-start gap-2 ${pushDown ? "top-16" : "top-4"}`}>
       <div className="relative w-64 sm:w-80">
         <div className="flex items-center gap-2 rounded-full border border-white/10 bg-surface/90 px-4 py-2.5 shadow-2xl backdrop-blur-md">
           <Search size={16} className="shrink-0 text-text-muted" />

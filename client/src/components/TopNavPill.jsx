@@ -9,9 +9,13 @@ const NAV_ITEMS = [
   { to: "/superheroes", label: "Superheroes", icon: Award, end: false },
 ];
 
-export default function TopNavPill() {
+export default function TopNavPill({ pushDown = false }) {
   return (
-    <nav className="absolute left-1/2 top-20 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/10 bg-surface/90 p-1.5 shadow-2xl backdrop-blur-md sm:top-4">
+    <nav
+      className={`absolute left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/10 bg-surface/90 p-1.5 shadow-2xl backdrop-blur-md ${
+        pushDown ? "top-36 sm:top-16" : "top-20 sm:top-4"
+      }`}
+    >
       {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
         <NavLink
           key={to}

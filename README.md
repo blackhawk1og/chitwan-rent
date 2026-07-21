@@ -81,7 +81,7 @@ should return a JSON array of ~180 seeded flat objects.
 - [x] Phase 1 — App shell & map base
 - [x] Phase 2 — Available flats + cluster badges + detail card
 - [x] Phase 3 — Search + filter
-- [ ] Phase 4 — List My Flat
+- [x] Phase 4 — List My Flat
 - [ ] Phase 5 — Find a Flat
 - [ ] Phase 6 — Spot a To-Let + Superheroes
 - [ ] Phase 7 — Bus routes + school/college layer
