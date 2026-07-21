@@ -1,6 +1,7 @@
 const ACCENT_BG = {
   purple: "bg-accent-purple",
   teal: "bg-accent-teal",
+  orange: "bg-accent-orange",
 };
 
 export default function PinDropBanner({ text, accent = "purple", onCancel }) {

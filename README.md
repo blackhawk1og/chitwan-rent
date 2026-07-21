@@ -83,7 +83,7 @@ should return a JSON array of ~180 seeded flat objects.
 - [x] Phase 3 — Search + filter
 - [x] Phase 4 — List My Flat
 - [x] Phase 5 — Find a Flat
-- [ ] Phase 6 — Spot a To-Let + Superheroes
+- [x] Phase 6 — Spot a To-Let + Superheroes
 - [ ] Phase 7 — Bus routes + school/college layer
 - [ ] Phase 8 — More panel: locate me / hide pins / area stats
 - [ ] Phase 9 — Polish & wrap-up

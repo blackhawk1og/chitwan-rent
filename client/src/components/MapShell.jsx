@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker } from "react-leaflet";
-import { Compass, Camera, MoreHorizontal, KeyRound, Search, Award } from "lucide-react";
+import { Compass, MoreHorizontal, KeyRound, Search } from "lucide-react";
 import {
   CHITWAN_CENTER,
   DEFAULT_ZOOM,
@@ -16,6 +16,7 @@ import { useAreas } from "../hooks/useAreas.js";
 import { useToletSpots } from "../hooks/useToletSpots.js";
 import { useCreateFlat } from "../hooks/useCreateFlat.js";
 import { useCreateSeekerPin } from "../hooks/useCreateSeekerPin.js";
+import { useCreateToletSpot } from "../hooks/useCreateToletSpot.js";
 import { usePinDropFlow } from "../hooks/usePinDropFlow.js";
 import { formatRs, bhkLabel } from "../lib/format.js";
 import { DEFAULT_FILTERS, countActiveFilters } from "../lib/filters.js";
@@ -36,6 +37,9 @@ import PinDropBanner from "./PinDropBanner.jsx";
 import PinDropCatcher from "./PinDropCatcher.jsx";
 import AddFlatForm from "./AddFlatForm.jsx";
 import DropSeekerPinForm from "./DropSeekerPinForm.jsx";
+import SpotToLetModal from "./SpotToLetModal.jsx";
+import SuperheroesModal from "./SuperheroesModal.jsx";
+import SuperheroesPage from "./SuperheroesPage.jsx";
 
 const HOW_TO_USE_STEPS = [
   "Browse available flats and flatmate-seeker pins on the map",
@@ -85,12 +89,24 @@ export default function MapShell() {
 
   const [justSubmittedFlats, setJustSubmittedFlats] = useState([]);
   const [justSubmittedSeekerPins, setJustSubmittedSeekerPins] = useState([]);
+  const [justSubmittedToletSpots, setJustSubmittedToletSpots] = useState([]);
   const createFlat = useCreateFlat();
   const createSeekerPin = useCreateSeekerPin();
+  const createToletSpot = useCreateToletSpot();
 
   const listFlatFlow = usePinDropFlow({ routePath: "/list-my-flat", onboardingKey: "list-my-flat", areas });
   const findFlatFlow = usePinDropFlow({ routePath: "/find-a-flat", onboardingKey: "find-a-flat", areas });
-  const pushDown = listFlatFlow.step === "pin-drop" || findFlatFlow.step === "pin-drop";
+
+  // Spot a To-Let: its own lightweight flow — no onboarding step, and the
+  // form's fields must survive the "pick on map" detour, so they're lifted
+  // up here rather than living inside the (temporarily unmounted) modal.
+  const [toletPhoto, setToletPhoto] = useState(null);
+  const [toletName, setToletName] = useState("");
+  const [toletMessage, setToletMessage] = useState("");
+  const [toletLocation, setToletLocation] = useState(null);
+  const [toletPicking, setToletPicking] = useState(false);
+
+  const pushDown = listFlatFlow.step === "pin-drop" || findFlatFlow.step === "pin-drop" || toletPicking;
 
   const displayedFlats = useMemo(() => {
     if (!justSubmittedFlats.length) return flats;
@@ -103,6 +119,12 @@ export default function MapShell() {
     const existingIds = new Set(seekerPins.map((s) => s.id));
     return [...seekerPins, ...justSubmittedSeekerPins.filter((s) => !existingIds.has(s.id))];
   }, [seekerPins, justSubmittedSeekerPins]);
+
+  const displayedToletSpots = useMemo(() => {
+    const base = filters.showToletBoards ? toletSpots : [];
+    const existingIds = new Set(base.map((s) => s.id));
+    return [...base, ...justSubmittedToletSpots.filter((s) => !existingIds.has(s.id))];
+  }, [filters.showToletBoards, toletSpots, justSubmittedToletSpots]);
 
   const closeRouteModal = () => navigate("/");
   const closeQuickModal = () => setQuickModal(null);
@@ -171,6 +193,55 @@ export default function MapShell() {
     }
   };
 
+  const resetToletFlow = () => {
+    setToletPhoto(null);
+    setToletName("");
+    setToletMessage("");
+    setToletLocation(null);
+    setToletPicking(false);
+  };
+
+  const handleCancelToletFlow = () => {
+    resetToletFlow();
+    closeQuickModal();
+  };
+
+  const handleUseGps = () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setToletLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {}
+    );
+  };
+
+  const handlePickToletOnMap = () => {
+    setToletPicking(true);
+  };
+
+  const handlePlaceToletPin = (latlng) => {
+    setToletLocation({ lat: latlng.lat, lng: latlng.lng });
+    setToletPicking(false);
+  };
+
+  const handleSubmitToletSpot = async () => {
+    if (!toletPhoto || !toletLocation) return;
+    try {
+      const created = await createToletSpot.mutateAsync({
+        photo_url: toletPhoto,
+        name: toletName || null,
+        message: toletMessage || null,
+        lat: toletLocation.lat,
+        lng: toletLocation.lng,
+      });
+      setJustSubmittedToletSpots((prev) => [...prev, created]);
+      mapRef.current?.flyTo([created.lat, created.lng], 16, { duration: 1 });
+      resetToletFlow();
+      setQuickModal("superheroes");
+    } catch {
+      // error surfaced via createToletSpot.isError in the form
+    }
+  };
+
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-bg">
       <MapContainer
@@ -191,7 +262,9 @@ export default function MapShell() {
           seekerPins={displayedSeekerPins}
           onSelect={(seeker) => setSelectedItem({ type: "seeker", data: seeker })}
         />
-        {filters.showToletBoards && <ToletSpotsLayer spots={toletSpots} />}
+        <ToletSpotsLayer spots={displayedToletSpots} />
+
+        {toletPicking && <PinDropCatcher onPlace={handlePlaceToletPin} />}
 
         {listFlatFlow.step === "pin-drop" && <PinDropCatcher onPlace={listFlatFlow.placePin} />}
         {listFlatFlow.step === "form" && listFlatFlow.draftPin && (
@@ -316,23 +389,38 @@ export default function MapShell() {
         />
       )}
 
-      {location.pathname === "/superheroes" && (
-        <StubModal
-          onClose={closeRouteModal}
-          icon={Award}
-          title="Chitwan's Rental Superheroes"
-          subtitle="They walk the streets so you don't have to."
-          phaseNote="The full leaderboard and Spot a To-Let flow arrives in Phase 6."
+      {location.pathname === "/superheroes" && <SuperheroesPage onClose={closeRouteModal} />}
+
+      {toletPicking && (
+        <PinDropBanner
+          text="👆 Tap the map to set your board's location"
+          accent="orange"
+          onCancel={() => setToletPicking(false)}
         />
       )}
 
-      {quickModal === "spot-a-tolet" && (
-        <StubModal
+      {quickModal === "spot-a-tolet" && !toletPicking && (
+        <SpotToLetModal
+          photoDataUrl={toletPhoto}
+          onPhotoChange={setToletPhoto}
+          name={toletName}
+          onNameChange={setToletName}
+          message={toletMessage}
+          onMessageChange={setToletMessage}
+          location={toletLocation}
+          onUseGps={handleUseGps}
+          onPickOnMap={handlePickToletOnMap}
+          onSubmit={handleSubmitToletSpot}
+          onCancel={handleCancelToletFlow}
+          submitting={createToletSpot.isPending}
+          submitError={createToletSpot.isError ? "Something went wrong — please try again." : null}
+        />
+      )}
+
+      {quickModal === "superheroes" && (
+        <SuperheroesModal
           onClose={closeQuickModal}
-          icon={Camera}
-          title="Spot a To-Let"
-          subtitle="See a To-Let board? Put it on the map."
-          phaseNote="This flow arrives in Phase 6."
+          onSpotToLet={() => setQuickModal("spot-a-tolet")}
         />
       )}
 
