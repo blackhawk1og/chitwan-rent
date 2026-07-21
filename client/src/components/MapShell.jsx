@@ -14,6 +14,8 @@ import { useFlats } from "../hooks/useFlats.js";
 import { useSeekerPins } from "../hooks/useSeekerPins.js";
 import { useAreas } from "../hooks/useAreas.js";
 import { useToletSpots } from "../hooks/useToletSpots.js";
+import { useBusRoutes } from "../hooks/useBusRoutes.js";
+import { usePois } from "../hooks/usePois.js";
 import { useCreateFlat } from "../hooks/useCreateFlat.js";
 import { useCreateSeekerPin } from "../hooks/useCreateSeekerPin.js";
 import { useCreateToletSpot } from "../hooks/useCreateToletSpot.js";
@@ -30,6 +32,8 @@ import FilterModal from "./FilterModal.jsx";
 import FlatsLayer from "./FlatsLayer.jsx";
 import SeekersLayer from "./SeekersLayer.jsx";
 import ToletSpotsLayer from "./ToletSpotsLayer.jsx";
+import BusRoutesLayer from "./BusRoutesLayer.jsx";
+import PoisLayer from "./PoisLayer.jsx";
 import ListingChip from "./ListingChip.jsx";
 import FlatDetailCard from "./FlatDetailCard.jsx";
 import SeekerDetailCard from "./SeekerDetailCard.jsx";
@@ -74,6 +78,7 @@ export default function MapShell() {
 
   const [satelliteOn, setSatelliteOn] = useState(false);
   const [busRoutesOn, setBusRoutesOn] = useState(false);
+  const [schoolsOn, setSchoolsOn] = useState(false);
   const [greenCoverOn, setGreenCoverOn] = useState(false);
 
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
@@ -83,6 +88,8 @@ export default function MapShell() {
   const { data: seekerPins = [] } = useSeekerPins();
   const { data: areas = [] } = useAreas();
   const { data: toletSpots = [] } = useToletSpots(filters.showToletBoards);
+  const { data: busRoutes = [] } = useBusRoutes(busRoutesOn);
+  const { data: schoolPois = [] } = usePois("school,college", schoolsOn);
 
   const [selectedItem, setSelectedItem] = useState(null); // { type: 'flat'|'seeker', data } | null
   const [expandedItem, setExpandedItem] = useState(null); // same shape, drives the full detail card
@@ -263,6 +270,8 @@ export default function MapShell() {
           onSelect={(seeker) => setSelectedItem({ type: "seeker", data: seeker })}
         />
         <ToletSpotsLayer spots={displayedToletSpots} />
+        {busRoutesOn && <BusRoutesLayer routes={busRoutes} />}
+        {schoolsOn && <PoisLayer pois={schoolPois} />}
 
         {toletPicking && <PinDropCatcher onPlace={handlePlaceToletPin} />}
 
@@ -311,6 +320,8 @@ export default function MapShell() {
             onSpotToLet={() => setQuickModal("spot-a-tolet")}
             busRoutesOn={busRoutesOn}
             onToggleBusRoutes={() => setBusRoutesOn((v) => !v)}
+            schoolsOn={schoolsOn}
+            onToggleSchools={() => setSchoolsOn((v) => !v)}
             satelliteOn={satelliteOn}
             onToggleSatellite={() => setSatelliteOn((v) => !v)}
             greenCoverOn={greenCoverOn}

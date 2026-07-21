@@ -1,8 +1,10 @@
-import { useState } from "react";
-import { Eye, PawPrint, Car, Ruler, ShieldCheck, ShieldOff, Users, Home } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Eye, PawPrint, Car, Ruler, ShieldCheck, ShieldOff, Users, Home, GraduationCap } from "lucide-react";
 import Modal from "./Modal.jsx";
 import PhotoCarousel from "./PhotoCarousel.jsx";
 import { formatRs, bhkLabel } from "../lib/format.js";
+import { usePois } from "../hooks/usePois.js";
+import { findNearest } from "../lib/geo.js";
 
 function Tag({ icon: Icon, children }) {
   return (
@@ -30,6 +32,8 @@ const WHO_LIVES_LABEL = { family: "Family", bachelor: "Bachelor" };
 
 export default function FlatDetailCard({ flat, onClose }) {
   const [revealed, setRevealed] = useState(false);
+  const { data: schoolPois = [] } = usePois("school,college");
+  const nearestSchool = useMemo(() => findNearest(flat.lat, flat.lng, schoolPois), [flat.lat, flat.lng, schoolPois]);
 
   return (
     <Modal onClose={onClose} maxWidthClass="max-w-lg">
@@ -61,6 +65,16 @@ export default function FlatDetailCard({ flat, onClose }) {
         <Stat icon={Car} label="Parking" value={`${flat.parking_for ?? 0} cars`} />
         <Stat icon={Ruler} label="Area" value={flat.sqft ? `${flat.sqft} sq.ft` : "—"} />
       </div>
+
+      {nearestSchool && (
+        <div className="mt-3 flex items-center gap-2 rounded-xl border border-white/10 bg-surface-alt px-3 py-2.5 text-sm">
+          <GraduationCap size={15} className="shrink-0 text-text-muted" />
+          <span className="text-text-muted">Nearest school:</span>
+          <span className="font-semibold text-text-primary">
+            {nearestSchool.point.name} ({nearestSchool.distanceKm.toFixed(1)} km)
+          </span>
+        </div>
+      )}
 
       <div className="mt-5 rounded-2xl border border-white/10 bg-surface-alt p-4">
         {revealed ? (

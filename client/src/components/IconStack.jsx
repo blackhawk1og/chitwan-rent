@@ -1,4 +1,4 @@
-import { Camera, Bus, Satellite, Leaf, MoreHorizontal } from "lucide-react";
+import { Camera, Bus, GraduationCap, Satellite, Leaf, MoreHorizontal } from "lucide-react";
 
 function StackButton({ icon: Icon, label, active, onClick }) {
   return (
@@ -21,6 +21,8 @@ export default function IconStack({
   onSpotToLet,
   busRoutesOn,
   onToggleBusRoutes,
+  schoolsOn,
+  onToggleSchools,
   satelliteOn,
   onToggleSatellite,
   greenCoverOn,
@@ -31,6 +33,7 @@ export default function IconStack({
     <div className="absolute right-4 top-1/2 flex -translate-y-1/2 flex-col gap-5">
       <StackButton icon={Camera} label="Spot a To-Let" onClick={onSpotToLet} />
       <StackButton icon={Bus} label="Bus Routes" active={busRoutesOn} onClick={onToggleBusRoutes} />
+      <StackButton icon={GraduationCap} label="Schools" active={schoolsOn} onClick={onToggleSchools} />
       <StackButton icon={Satellite} label="Satellite" active={satelliteOn} onClick={onToggleSatellite} />
       <StackButton icon={Leaf} label="Green Cover" active={greenCoverOn} onClick={onToggleGreenCover} />
       <StackButton icon={MoreHorizontal} label="More" onClick={onMore} />

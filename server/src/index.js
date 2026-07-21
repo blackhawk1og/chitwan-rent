@@ -7,6 +7,8 @@ import areasRouter from "./routes/areas.js";
 import toletSpotsRouter from "./routes/toletSpots.js";
 import statsRouter from "./routes/stats.js";
 import superheroesRouter from "./routes/superheroes.js";
+import busRoutesRouter from "./routes/busRoutes.js";
+import poisRouter from "./routes/pois.js";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -25,6 +27,8 @@ app.use("/api/areas", areasRouter);
 app.use("/api/tolet-spots", toletSpotsRouter);
 app.use("/api/stats", statsRouter);
 app.use("/api/superheroes", superheroesRouter);
+app.use("/api/bus-routes", busRoutesRouter);
+app.use("/api/pois", poisRouter);
 
 app.listen(PORT, () => {
   console.log(`API server listening on http://localhost:${PORT}`);

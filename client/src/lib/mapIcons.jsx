@@ -69,3 +69,48 @@ export function createClusterBadgeIcon({ line1, line2, tone = "light" }) {
     iconSize: null,
   });
 }
+
+// Small icon + text label, baked into one marker — used for POIs (schools/colleges).
+export function createLabeledPoiIcon(IconComponent, label, { bg = "#38bdf8" } = {}) {
+  const html = renderToStaticMarkup(
+    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+      <div
+        style={{
+          width: 20,
+          height: 20,
+          flexShrink: 0,
+          borderRadius: "9999px",
+          background: bg,
+          border: "2px solid white",
+          boxShadow: "0 2px 6px rgba(0,0,0,0.4)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <IconComponent size={11} color="white" strokeWidth={2.5} />
+      </div>
+      <span
+        style={{
+          fontSize: 10,
+          fontWeight: 700,
+          color: "#fff",
+          background: "rgba(11,12,23,0.75)",
+          padding: "1px 6px",
+          borderRadius: 6,
+          whiteSpace: "nowrap",
+          fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+        }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+
+  return L.divIcon({
+    html,
+    className: "chitwan-pin-icon",
+    iconSize: null,
+    iconAnchor: [10, 10],
+  });
+}

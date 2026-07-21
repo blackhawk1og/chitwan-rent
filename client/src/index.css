@@ -45,3 +45,20 @@ body {
 .leaflet-popup-close-button {
   color: #9ca3af !important;
 }
+
+.leaflet-tooltip {
+  background: #151626;
+  color: #f5f5f7;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.leaflet-tooltip-top:before,
+.leaflet-tooltip-bottom:before,
+.leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before {
+  border-top-color: #151626;
+}
