@@ -10,11 +10,19 @@ import {
   SATELLITE_TILE_URL,
   SATELLITE_ATTRIBUTION,
 } from "../lib/mapConfig.js";
+import { useFlats } from "../hooks/useFlats.js";
+import { useSeekerPins } from "../hooks/useSeekerPins.js";
+import { formatRs, bhkLabel } from "../lib/format.js";
 import TopNavPill from "./TopNavPill.jsx";
 import SearchBar from "./SearchBar.jsx";
 import IconStack from "./IconStack.jsx";
 import OnboardingModal from "./OnboardingModal.jsx";
 import StubModal from "./StubModal.jsx";
+import FlatsLayer from "./FlatsLayer.jsx";
+import SeekersLayer from "./SeekersLayer.jsx";
+import ListingChip from "./ListingChip.jsx";
+import FlatDetailCard from "./FlatDetailCard.jsx";
+import SeekerDetailCard from "./SeekerDetailCard.jsx";
 
 const HOW_TO_USE_STEPS = [
   "Browse available flats and flatmate-seeker pins on the map",
@@ -34,6 +42,12 @@ export default function MapShell() {
   const [busRoutesOn, setBusRoutesOn] = useState(false);
   const [greenCoverOn, setGreenCoverOn] = useState(false);
 
+  const { data: flats = [] } = useFlats("available");
+  const { data: seekerPins = [] } = useSeekerPins();
+
+  const [selectedItem, setSelectedItem] = useState(null); // { type: 'flat'|'seeker', data } | null
+  const [expandedItem, setExpandedItem] = useState(null); // same shape, drives the full detail card
+
   const closeRouteModal = () => navigate("/");
   const closeQuickModal = () => setQuickModal(null);
 
@@ -50,6 +64,12 @@ export default function MapShell() {
         ) : (
           <TileLayer key="dark" url={DARK_TILE_URL} attribution={DARK_TILE_ATTRIBUTION} />
         )}
+
+        <FlatsLayer flats={flats} onSelect={(flat) => setSelectedItem({ type: "flat", data: flat })} />
+        <SeekersLayer
+          seekerPins={seekerPins}
+          onSelect={(seeker) => setSelectedItem({ type: "seeker", data: seeker })}
+        />
       </MapContainer>
 
       {greenCoverOn && (
@@ -150,6 +170,34 @@ export default function MapShell() {
           subtitle="Customize the way you see chitwan.rent."
           phaseNote="The full filter modal arrives in Phase 3."
         />
+      )}
+
+      {selectedItem?.type === "flat" && (
+        <ListingChip
+          stripColor="#7c3aed"
+          title={`${bhkLabel(selectedItem.data.bhk)} · ${formatRs(selectedItem.data.rent)}`}
+          subtitle={selectedItem.data.area}
+          onExpand={() => setExpandedItem(selectedItem)}
+          onClose={() => setSelectedItem(null)}
+        />
+      )}
+
+      {selectedItem?.type === "seeker" && (
+        <ListingChip
+          stripColor="#14b8a6"
+          title={`Looking · ${formatRs(selectedItem.data.budget)}`}
+          subtitle={selectedItem.data.area}
+          onExpand={() => setExpandedItem(selectedItem)}
+          onClose={() => setSelectedItem(null)}
+        />
+      )}
+
+      {expandedItem?.type === "flat" && (
+        <FlatDetailCard flat={expandedItem.data} onClose={() => setExpandedItem(null)} />
+      )}
+
+      {expandedItem?.type === "seeker" && (
+        <SeekerDetailCard seeker={expandedItem.data} onClose={() => setExpandedItem(null)} />
       )}
     </div>
   );

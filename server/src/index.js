@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import flatsRouter from "./routes/flats.js";
+import seekerPinsRouter from "./routes/seekerPins.js";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -14,6 +15,7 @@ app.get("/api/health", (req, res) => {
 });
 
 app.use("/api/flats", flatsRouter);
+app.use("/api/seeker-pins", seekerPinsRouter);
 
 app.listen(PORT, () => {
   console.log(`API server listening on http://localhost:${PORT}`);

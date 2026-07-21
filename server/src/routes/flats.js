@@ -3,13 +3,19 @@ import { query } from "../db.js";
 
 const router = Router();
 
+const SELECT_WITH_OWNER = `
+  SELECT f.*, u.name AS owner_name, u.phone AS owner_phone, u.email AS owner_email
+  FROM flats f
+  LEFT JOIN users u ON u.id = f.owner_id
+`;
+
 // GET /api/flats?status=available
 router.get("/", async (req, res) => {
   const { status } = req.query;
   try {
     const result = status
-      ? await query("SELECT * FROM flats WHERE status = $1 ORDER BY posted_at DESC", [status])
-      : await query("SELECT * FROM flats ORDER BY posted_at DESC");
+      ? await query(`${SELECT_WITH_OWNER} WHERE f.status = $1 ORDER BY f.posted_at DESC`, [status])
+      : await query(`${SELECT_WITH_OWNER} ORDER BY f.posted_at DESC`);
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -19,7 +25,7 @@ router.get("/", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   try {
-    const result = await query("SELECT * FROM flats WHERE id = $1", [req.params.id]);
+    const result = await query(`${SELECT_WITH_OWNER} WHERE f.id = $1`, [req.params.id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Flat not found" });
     }

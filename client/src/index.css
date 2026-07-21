@@ -18,3 +18,15 @@ body {
   height: 100%;
   background-color: #0b0c17;
 }
+
+/* Our marker/cluster icons are fully custom — strip Leaflet's default
+   white background + border chrome so only our own styling shows. */
+.leaflet-div-icon {
+  background: transparent;
+  border: none;
+}
+
+.chitwan-pin-icon,
+.chitwan-cluster-icon {
+  cursor: pointer;
+}
