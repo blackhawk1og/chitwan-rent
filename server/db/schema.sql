@@ -30,6 +30,7 @@ CREATE TABLE flats (
   pets_allowed TEXT, -- 'yes'|'no'|'not_sure'
   parking_for INT DEFAULT 0,
   sqft INT,
+  rating DOUBLE PRECISION, -- 3.5-5.0, shown on the map's info-chip marker
   one_liner TEXT,
   status TEXT DEFAULT 'available', -- 'available' | 'rented' | 'pending_review'
   lat DOUBLE PRECISION,

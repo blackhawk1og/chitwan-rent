@@ -59,7 +59,7 @@ export default function AddFlatForm({ onCancel, onSubmit, submitting, submitErro
 
       <div className="mt-6 grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2">
         {/* Card 1 */}
-        <div className="space-y-5 rounded-2xl border border-white/10 bg-surface-alt/40 p-5">
+        <div className="min-w-0 space-y-5 rounded-2xl border border-white/10 bg-surface-alt/40 p-5">
           <div>
             <SectionLabel>Bedrooms (BHK) *</SectionLabel>
             <div className="flex flex-wrap gap-2">
@@ -93,8 +93,8 @@ export default function AddFlatForm({ onCancel, onSubmit, submitting, submitErro
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
               <div className="text-sm font-semibold text-text-primary">Includes Maintenance</div>
               <div className="text-xs text-text-muted">Is maintenance bundled in rent?</div>
             </div>
@@ -141,7 +141,7 @@ export default function AddFlatForm({ onCancel, onSubmit, submitting, submitErro
         </div>
 
         {/* Card 2 */}
-        <div className="space-y-5 rounded-2xl border border-white/10 bg-surface-alt/40 p-5">
+        <div className="min-w-0 space-y-5 rounded-2xl border border-white/10 bg-surface-alt/40 p-5">
           <div>
             <SectionLabel>Pets allowed? (optional)</SectionLabel>
             <div className="flex flex-wrap gap-2">

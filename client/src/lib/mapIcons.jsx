@@ -115,6 +115,47 @@ export function createLabeledPoiIcon(IconComponent, label, { bg = "#38bdf8" } = 
   });
 }
 
+// Compact info chip for an individual flat pin: "3BHK · 29.2K · ★ 4.0" in one row.
+export function createFlatInfoChipIcon({ bhk, rent, rating }) {
+  const bhkLabel = bhk >= 5 ? "5+" : bhk;
+  const priceLabel = `${(rent / 1000).toFixed(1)}K`;
+  const ratingLabel = rating != null ? Number(rating).toFixed(1) : "—";
+
+  const divider = (
+    <span style={{ width: 1, height: 12, background: "rgba(255,255,255,0.18)", flexShrink: 0 }} />
+  );
+
+  const html = renderToStaticMarkup(
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "6px 10px",
+        borderRadius: 9999,
+        background: "rgba(17,18,32,0.96)",
+        border: "1px solid rgba(255,255,255,0.12)",
+        boxShadow: "0 3px 10px rgba(0,0,0,0.45)",
+        fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span style={{ fontSize: 11, fontWeight: 800, color: "#ffffff" }}>{bhkLabel}BHK</span>
+      {divider}
+      <span style={{ fontSize: 11, fontWeight: 800, color: "#ffffff" }}>{priceLabel}</span>
+      {divider}
+      <span style={{ fontSize: 11, fontWeight: 800, color: "#facc15" }}>★ {ratingLabel}</span>
+    </div>
+  );
+
+  return L.divIcon({
+    html,
+    className: "chitwan-pin-icon",
+    iconSize: null,
+    iconAnchor: [50, 14],
+  });
+}
+
 // White circular drag handle for the Area Stats rectangle's corners.
 export function createHandleIcon() {
   const html = renderToStaticMarkup(

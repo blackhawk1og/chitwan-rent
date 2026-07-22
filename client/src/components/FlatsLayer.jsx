@@ -1,10 +1,7 @@
 import { useMemo } from "react";
 import { Marker } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
-import { Home } from "lucide-react";
-import { createDotIcon, createClusterBadgeIcon } from "../lib/mapIcons.jsx";
-
-const flatIcon = createDotIcon(Home, { bg: "#7c3aed" });
+import { createFlatInfoChipIcon, createClusterBadgeIcon } from "../lib/mapIcons.jsx";
 
 export default function FlatsLayer({ flats, onSelect }) {
   const iconCreateFunction = useMemo(
@@ -19,6 +16,17 @@ export default function FlatsLayer({ flats, onSelect }) {
     []
   );
 
+  const icons = useMemo(
+    () =>
+      Object.fromEntries(
+        flats.map((flat) => [
+          flat.id,
+          createFlatInfoChipIcon({ bhk: flat.bhk, rent: flat.rent, rating: flat.rating }),
+        ])
+      ),
+    [flats]
+  );
+
   return (
     <MarkerClusterGroup
       iconCreateFunction={iconCreateFunction}
@@ -30,7 +38,7 @@ export default function FlatsLayer({ flats, onSelect }) {
         <Marker
           key={flat.id}
           position={[flat.lat, flat.lng]}
-          icon={flatIcon}
+          icon={icons[flat.id]}
           eventHandlers={{ click: () => onSelect(flat) }}
         />
       ))}

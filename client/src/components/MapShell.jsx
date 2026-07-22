@@ -37,6 +37,7 @@ import ListingChip from "./ListingChip.jsx";
 import FlatDetailCard from "./FlatDetailCard.jsx";
 import SeekerDetailCard from "./SeekerDetailCard.jsx";
 import PinDropBanner from "./PinDropBanner.jsx";
+import AvlbFlatsBanner from "./AvlbFlatsBanner.jsx";
 import PinDropCatcher from "./PinDropCatcher.jsx";
 import AddFlatForm from "./AddFlatForm.jsx";
 import DropSeekerPinForm from "./DropSeekerPinForm.jsx";
@@ -177,6 +178,15 @@ export default function MapShell() {
 
   const handleSelectLocation = (suggestion) => {
     mapRef.current?.flyTo([suggestion.lat, suggestion.lng], 15, { duration: 1.2 });
+  };
+
+  const handleAvlbFlatsClick = () => {
+    if (location.pathname !== "/") navigate("/");
+    setFilters((f) => ({ ...f, availableOnly: true }));
+  };
+
+  const handleCancelAvlbFlats = () => {
+    setFilters((f) => ({ ...f, availableOnly: false }));
   };
 
   const handleSubmitFlatForm = async (form) => {
@@ -422,7 +432,11 @@ export default function MapShell() {
 
       <div className="pointer-events-none absolute inset-0 z-[1000]">
         <div className="pointer-events-auto">
-          <TopNavPill pushDown={pushDown} />
+          <TopNavPill
+            pushDown={pushDown}
+            avlbFlatsActive={filters.availableOnly}
+            onAvlbFlatsClick={handleAvlbFlatsClick}
+          />
         </div>
         <div className="pointer-events-auto">
           <SearchBar
@@ -435,6 +449,11 @@ export default function MapShell() {
             pushDown={pushDown}
           />
         </div>
+        {filters.availableOnly && (
+          <div className="pointer-events-auto">
+            <AvlbFlatsBanner onCancel={handleCancelAvlbFlats} />
+          </div>
+        )}
         <div className="pointer-events-auto">
           <IconStack
             onSpotToLet={() => withAuth(() => setQuickModal("spot-a-tolet"))}

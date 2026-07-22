@@ -37,6 +37,10 @@ function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+function randomRating() {
+  return Number((3.5 + Math.random() * 1.5).toFixed(1));
+}
+
 function pick(arr) {
   return arr[randInt(0, arr.length - 1)];
 }
@@ -150,6 +154,7 @@ async function seedFlats(users, count = 180) {
       Math.random() < 0.7 ? pick(["yes", "no", "not_sure"]) : null,
       randInt(0, 3),
       randInt(band.sqftMin, band.sqftMax),
+      randomRating(),
       Math.random() < 0.8 ? pick(ONE_LINERS) : null,
       status,
       lat,
@@ -164,9 +169,9 @@ async function seedFlats(users, count = 180) {
     await pool.query(
       `INSERT INTO flats
         (owner_id, listing_type, bhk, rent, deposit, furnishing, includes_maintenance,
-         gated, who_lives, pets_allowed, parking_for, sqft, one_liner, status,
+         gated, who_lives, pets_allowed, parking_for, sqft, rating, one_liner, status,
          lat, lng, area, photos, posted_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
       r
     );
   }

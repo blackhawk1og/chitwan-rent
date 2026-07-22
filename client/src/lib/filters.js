@@ -1,5 +1,5 @@
 export const DEFAULT_FILTERS = {
-  availableOnly: true,
+  availableOnly: false,
   bhk: [], // array of ints; 5 represents "5+"
   rentMin: "",
   rentMax: "",
@@ -29,7 +29,7 @@ export function buildFlatsQueryParams(filters) {
 
 export function countActiveFilters(filters) {
   let count = 0;
-  if (!filters.availableOnly) count++;
+  if (filters.availableOnly) count++;
   if (filters.bhk?.length) count++;
   if (filters.rentMin || filters.rentMax) count++;
   if (filters.area && filters.area !== "all") count++;

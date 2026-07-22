@@ -102,6 +102,12 @@ router.get("/:id", async (req, res) => {
 // silently flips to available a few seconds later, no manual moderation step.
 const AUTO_AVAILABLE_DELAY_MS = 8000;
 
+// New listings don't have organic reviews yet — seed a placeholder rating in
+// the same 3.5-5.0 range as the seed data so the map's info-chip has something to show.
+function randomRating() {
+  return Number((3.5 + Math.random() * 1.5).toFixed(1));
+}
+
 router.post("/", requireAuth, async (req, res) => {
   const {
     listing_type, bhk, rent, deposit, furnishing, includes_maintenance,
@@ -116,13 +122,13 @@ router.post("/", requireAuth, async (req, res) => {
     const result = await query(
       `INSERT INTO flats
         (owner_id, listing_type, bhk, rent, deposit, furnishing, includes_maintenance,
-         gated, who_lives, pets_allowed, parking_for, sqft, one_liner, status, lat, lng, area, photos)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending_review',$14,$15,$16,$17)
+         gated, who_lives, pets_allowed, parking_for, sqft, rating, one_liner, status, lat, lng, area, photos)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'pending_review',$15,$16,$17,$18)
        RETURNING *`,
       [
         req.userId, listing_type ?? "flat", bhk, rent, deposit ?? null, furnishing,
         includes_maintenance ?? false, gated, who_lives ?? null, pets_allowed ?? null,
-        parking_for ?? 0, sqft ?? null, one_liner ?? null, lat, lng, area ?? null, photos ?? [],
+        parking_for ?? 0, sqft ?? null, randomRating(), one_liner ?? null, lat, lng, area ?? null, photos ?? [],
       ]
     );
 

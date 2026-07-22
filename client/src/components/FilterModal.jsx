@@ -59,7 +59,7 @@ export default function FilterModal({ initialFilters, onApply, onClose }) {
 
       <div className="mt-6 grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2">
         {/* Left column */}
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <div>
             <SectionLabel>Sponsored</SectionLabel>
             <div className="rounded-xl border border-dashed border-white/10 px-4 py-3 text-xs text-text-muted">
@@ -67,8 +67,8 @@ export default function FilterModal({ initialFilters, onApply, onClose }) {
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-text-primary">Available flats for rent</span>
+          <div className="flex items-center justify-between gap-3">
+            <span className="min-w-0 text-sm font-semibold text-text-primary">Available flats for rent</span>
             <Switch
               checked={draft.availableOnly}
               onChange={(v) => setDraft((d) => ({ ...d, availableOnly: v }))}
@@ -155,7 +155,7 @@ export default function FilterModal({ initialFilters, onApply, onClose }) {
         </div>
 
         {/* Right column */}
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <div>
             <SectionLabel>Society type</SectionLabel>
             <div className="flex gap-2">
@@ -193,10 +193,10 @@ export default function FilterModal({ initialFilters, onApply, onClose }) {
 
           <div>
             <SectionLabel>To-let boards spotted by users</SectionLabel>
-            <div className="flex items-center justify-between rounded-xl border border-white/10 bg-surface-alt px-4 py-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-                <Mail size={15} />
-                Show To-Let boards
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-surface-alt px-4 py-3">
+              <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-text-primary">
+                <Mail size={15} className="shrink-0" />
+                <span className="min-w-0">Show To-Let boards</span>
               </div>
               <Switch
                 checked={draft.showToletBoards}
@@ -208,10 +208,10 @@ export default function FilterModal({ initialFilters, onApply, onClose }) {
 
           <div>
             <SectionLabel>Near bus route</SectionLabel>
-            <div className="flex items-center justify-between rounded-xl border border-white/10 bg-surface-alt px-4 py-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-                <Bus size={15} />
-                Near Bus Route
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-surface-alt px-4 py-3">
+              <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-text-primary">
+                <Bus size={15} className="shrink-0" />
+                <span className="min-w-0">Near Bus Route</span>
               </div>
               <Switch
                 checked={draft.nearBusRoute}

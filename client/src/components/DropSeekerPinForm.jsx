@@ -71,7 +71,7 @@ export default function DropSeekerPinForm({ lat, lng, onCancel, onSubmit, submit
 
       <div className="mt-6 grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2">
         {/* Card 1 */}
-        <div className="space-y-5 rounded-2xl border border-white/10 bg-surface-alt/40 p-5">
+        <div className="min-w-0 space-y-5 rounded-2xl border border-white/10 bg-surface-alt/40 p-5">
           <blockquote className="rounded-xl border border-white/10 bg-surface-alt px-4 py-3 text-sm italic text-text-primary/90">
             "Dropped a pin near Pulchowk on a Tuesday, moved in by the weekend — no broker fees."
             <footer className="mt-1.5 text-xs not-italic text-text-muted">— Rekha K., Bharatpur-5</footer>
@@ -159,7 +159,7 @@ export default function DropSeekerPinForm({ lat, lng, onCancel, onSubmit, submit
         </div>
 
         {/* Card 2 */}
-        <div className="space-y-5 rounded-2xl border border-white/10 bg-surface-alt/40 p-5">
+        <div className="min-w-0 space-y-5 rounded-2xl border border-white/10 bg-surface-alt/40 p-5">
           <div>
             <SectionLabel>You are (optional but helps matching)</SectionLabel>
             <div className="flex flex-wrap gap-2">
