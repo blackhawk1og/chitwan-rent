@@ -9,6 +9,7 @@ import statsRouter from "./routes/stats.js";
 import superheroesRouter from "./routes/superheroes.js";
 import busRoutesRouter from "./routes/busRoutes.js";
 import poisRouter from "./routes/pois.js";
+import authRouter from "./routes/auth.js";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -29,6 +30,7 @@ app.use("/api/stats", statsRouter);
 app.use("/api/superheroes", superheroesRouter);
 app.use("/api/bus-routes", busRoutesRouter);
 app.use("/api/pois", poisRouter);
+app.use("/api/auth", authRouter);
 
 app.listen(PORT, () => {
   console.log(`API server listening on http://localhost:${PORT}`);

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { query } from "../db.js";
 import { isNearAnyRoute } from "../lib/geo.js";
+import { requireAuth } from "../lib/auth.js";
 
 const router = Router();
 
@@ -97,34 +98,20 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// No auth yet (that's Phase 9) — a submitted email just resolves to a
-// lightweight user row so "Reveal contact" has something to show.
-async function resolveOwnerId(ownerId, email) {
-  if (ownerId) return ownerId;
-  if (!email) return null;
-
-  const existing = await query("SELECT id FROM users WHERE email = $1", [email]);
-  if (existing.rows.length) return existing.rows[0].id;
-
-  const created = await query(
-    "INSERT INTO users (email, role) VALUES ($1, 'user') RETURNING id",
-    [email]
-  );
-  return created.rows[0].id;
-}
-
 // Dummy "feels alive" touch: a fresh listing starts pending_review and
 // silently flips to available a few seconds later, no manual moderation step.
 const AUTO_AVAILABLE_DELAY_MS = 8000;
 
-router.post("/", async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   const {
-    owner_id, listing_type, bhk, rent, deposit, furnishing, includes_maintenance,
+    listing_type, bhk, rent, deposit, furnishing, includes_maintenance,
     gated, who_lives, pets_allowed, parking_for, sqft, one_liner, lat, lng, area, photos, email,
   } = req.body;
 
   try {
-    const resolvedOwnerId = await resolveOwnerId(owner_id, email);
+    if (email) {
+      await query("UPDATE users SET email = COALESCE(email, $1) WHERE id = $2", [email, req.userId]);
+    }
 
     const result = await query(
       `INSERT INTO flats
@@ -133,7 +120,7 @@ router.post("/", async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending_review',$14,$15,$16,$17)
        RETURNING *`,
       [
-        resolvedOwnerId, listing_type ?? "flat", bhk, rent, deposit ?? null, furnishing,
+        req.userId, listing_type ?? "flat", bhk, rent, deposit ?? null, furnishing,
         includes_maintenance ?? false, gated, who_lives ?? null, pets_allowed ?? null,
         parking_for ?? 0, sqft ?? null, one_liner ?? null, lat, lng, area ?? null, photos ?? [],
       ]

@@ -46,6 +46,8 @@ import SuperheroesPage from "./SuperheroesPage.jsx";
 import MoreModal from "./MoreModal.jsx";
 import AreaRectangleLayer from "./AreaRectangleLayer.jsx";
 import AreaStatsResultsModal from "./AreaStatsResultsModal.jsx";
+import AuthGateModal from "./AuthGateModal.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 
 const HOW_TO_USE_STEPS = [
   "Browse available flats and flatmate-seeker pins on the map",
@@ -81,6 +83,15 @@ export default function MapShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const mapRef = useRef(null);
+  const { isAuthenticated } = useAuth();
+
+  // Generic auth gate for actions that aren't tied to a route (Spot a To-Let).
+  // Route-based flows (List My Flat / Find a Flat) gate via usePinDropFlow instead.
+  const [pendingAuthAction, setPendingAuthAction] = useState(null);
+  const withAuth = (action) => {
+    if (isAuthenticated) action();
+    else setPendingAuthAction(() => action);
+  };
 
   const [searchValue, setSearchValue] = useState("");
   const [quickModal, setQuickModal] = useState(null); // 'spot-a-tolet' | 'more' | 'filters' | null
@@ -93,7 +104,7 @@ export default function MapShell() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const filterCount = countActiveFilters(filters);
 
-  const { data: flats = [] } = useFlats(filters);
+  const { data: flats = [], isLoading: flatsLoading } = useFlats(filters);
   const { data: seekerPins = [] } = useSeekerPins();
   const { data: areas = [] } = useAreas();
   const { data: toletSpots = [] } = useToletSpots(filters.showToletBoards);
@@ -110,8 +121,18 @@ export default function MapShell() {
   const createSeekerPin = useCreateSeekerPin();
   const createToletSpot = useCreateToletSpot();
 
-  const listFlatFlow = usePinDropFlow({ routePath: "/list-my-flat", onboardingKey: "list-my-flat", areas });
-  const findFlatFlow = usePinDropFlow({ routePath: "/find-a-flat", onboardingKey: "find-a-flat", areas });
+  const listFlatFlow = usePinDropFlow({
+    routePath: "/list-my-flat",
+    onboardingKey: "list-my-flat",
+    areas,
+    isAuthenticated,
+  });
+  const findFlatFlow = usePinDropFlow({
+    routePath: "/find-a-flat",
+    onboardingKey: "find-a-flat",
+    areas,
+    isAuthenticated,
+  });
 
   // Spot a To-Let: its own lightweight flow — no onboarding step, and the
   // form's fields must survive the "pick on map" detour, so they're lifted
@@ -416,7 +437,7 @@ export default function MapShell() {
         </div>
         <div className="pointer-events-auto">
           <IconStack
-            onSpotToLet={() => setQuickModal("spot-a-tolet")}
+            onSpotToLet={() => withAuth(() => setQuickModal("spot-a-tolet"))}
             busRoutesOn={busRoutesOn}
             onToggleBusRoutes={() => setBusRoutesOn((v) => !v)}
             schoolsOn={schoolsOn}
@@ -438,6 +459,10 @@ export default function MapShell() {
           steps={HOW_TO_USE_STEPS}
           ctaLabel="Got it, let's go"
         />
+      )}
+
+      {listFlatFlow.step === "auth" && (
+        <AuthGateModal onSuccess={listFlatFlow.proceedAfterAuth} onCancel={closeRouteModal} />
       )}
 
       {listFlatFlow.step === "onboarding" && (
@@ -467,6 +492,10 @@ export default function MapShell() {
           submitError={createFlat.isError ? "Something went wrong — please try again." : null}
           area={listFlatFlow.draftPin.area}
         />
+      )}
+
+      {findFlatFlow.step === "auth" && (
+        <AuthGateModal onSuccess={findFlatFlow.proceedAfterAuth} onCancel={closeRouteModal} />
       )}
 
       {findFlatFlow.step === "onboarding" && (
@@ -501,6 +530,17 @@ export default function MapShell() {
 
       {location.pathname === "/superheroes" && <SuperheroesPage onClose={closeRouteModal} />}
 
+      {pendingAuthAction && (
+        <AuthGateModal
+          onSuccess={() => {
+            const action = pendingAuthAction;
+            setPendingAuthAction(null);
+            action();
+          }}
+          onCancel={() => setPendingAuthAction(null)}
+        />
+      )}
+
       {toletPicking && (
         <PinDropBanner
           text="👆 Tap the map to set your board's location"
@@ -530,7 +570,7 @@ export default function MapShell() {
       {quickModal === "superheroes" && (
         <SuperheroesModal
           onClose={closeQuickModal}
-          onSpotToLet={() => setQuickModal("spot-a-tolet")}
+          onSpotToLet={() => withAuth(() => setQuickModal("spot-a-tolet"))}
         />
       )}
 
@@ -615,6 +655,17 @@ export default function MapShell() {
 
       {expandedItem?.type === "seeker" && (
         <SeekerDetailCard seeker={expandedItem.data} onClose={() => setExpandedItem(null)} />
+      )}
+
+      {flatsLoading && (
+        <div className="pointer-events-none absolute bottom-8 left-1/2 z-[900] -translate-x-1/2 rounded-full border border-white/10 bg-surface/90 px-4 py-2 text-xs font-semibold text-text-muted shadow-lg backdrop-blur-md">
+          Loading flats…
+        </div>
+      )}
+      {!flatsLoading && displayedFlats.length === 0 && (
+        <div className="pointer-events-none absolute bottom-8 left-1/2 z-[900] -translate-x-1/2 rounded-full border border-white/10 bg-surface/90 px-4 py-2 text-xs font-semibold text-text-muted shadow-lg backdrop-blur-md">
+          No flats match your filters
+        </div>
       )}
     </div>
   );

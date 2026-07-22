@@ -3,23 +3,30 @@ import { useLocation } from "react-router-dom";
 import { isOnboardingDismissed } from "../components/OnboardingModal.jsx";
 import { reverseGeocodeArea } from "../lib/geocode.js";
 
-// Drives the shared "onboarding -> pin-drop -> form" state machine used by
-// both List My Flat and Find a Flat. Only one instance is ever active at a
-// time since each is keyed to its own route path.
-export function usePinDropFlow({ routePath, onboardingKey, areas }) {
+// Drives the shared "auth -> onboarding -> pin-drop -> form" state machine
+// used by both List My Flat and Find a Flat. Only one instance is ever
+// active at a time since each is keyed to its own route path.
+export function usePinDropFlow({ routePath, onboardingKey, areas, isAuthenticated }) {
   const location = useLocation();
-  const [step, setStep] = useState(null); // 'onboarding' | 'pin-drop' | 'form' | null
+  const [step, setStep] = useState(null); // 'auth' | 'onboarding' | 'pin-drop' | 'form' | null
   const [draftPin, setDraftPin] = useState(null); // { lat, lng, area }
 
   useEffect(() => {
     if (location.pathname === routePath) {
-      setStep(isOnboardingDismissed(onboardingKey) ? "pin-drop" : "onboarding");
+      setStep(!isAuthenticated ? "auth" : isOnboardingDismissed(onboardingKey) ? "pin-drop" : "onboarding");
       setDraftPin(null);
     } else {
       setStep(null);
       setDraftPin(null);
     }
+    // Deliberately excludes isAuthenticated — signing in mid-flow should not
+    // reset an in-progress step; see proceedAfterAuth for that transition.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, routePath, onboardingKey]);
+
+  const proceedAfterAuth = () => {
+    setStep(isOnboardingDismissed(onboardingKey) ? "pin-drop" : "onboarding");
+  };
 
   const resolveArea = async (lat, lng) => {
     const area = await reverseGeocodeArea(lat, lng, areas);
@@ -49,5 +56,5 @@ export function usePinDropFlow({ routePath, onboardingKey, areas }) {
     setDraftPin(null);
   };
 
-  return { step, setStep, draftPin, placePin, dragPin, cancelForm, finish };
+  return { step, setStep, draftPin, placePin, dragPin, cancelForm, finish, proceedAfterAuth };
 }

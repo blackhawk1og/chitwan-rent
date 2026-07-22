@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { query } from "../db.js";
+import { requireAuth } from "../lib/auth.js";
 
 const router = Router();
 
@@ -27,14 +28,21 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   const {
-    user_id, looking_for, budget, bhk_pref, move_in, food_pref, smoker_ok,
+    looking_for, budget, bhk_pref, move_in, food_pref, smoker_ok,
     gender, flatmate_gender_pref, parking_required, lifestyle_note, email, phone,
     lat, lng, area,
   } = req.body;
 
   try {
+    if (email || phone) {
+      await query(
+        "UPDATE users SET email = COALESCE(email, $1), phone = COALESCE(phone, $2) WHERE id = $3",
+        [email ?? null, phone ?? null, req.userId]
+      );
+    }
+
     const result = await query(
       `INSERT INTO seeker_pins
         (user_id, looking_for, budget, bhk_pref, move_in, food_pref, smoker_ok,
@@ -42,7 +50,7 @@ router.post("/", async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
        RETURNING *`,
       [
-        user_id ?? null, looking_for, budget ?? null, bhk_pref ?? null, move_in ?? null,
+        req.userId, looking_for, budget ?? null, bhk_pref ?? null, move_in ?? null,
         food_pref ?? null, smoker_ok ?? null, gender ?? null, flatmate_gender_pref ?? null,
         parking_required ?? false, lifestyle_note ?? null, email ?? null, phone ?? null,
         lat, lng, area ?? null,
