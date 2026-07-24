@@ -19,7 +19,7 @@ export default function SuperheroesModal({ onClose, onSpotToLet }) {
   const { data: heroes = [], isLoading } = useSuperheroes();
 
   return (
-    <Modal onClose={onClose} maxWidthClass="max-w-md">
+    <Modal onClose={onClose} maxWidthClass="max-w-lg">
       <div className="flex items-start gap-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent-orange/20 text-accent-orange">
           <Award size={22} />

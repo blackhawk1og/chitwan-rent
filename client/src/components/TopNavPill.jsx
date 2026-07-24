@@ -10,13 +10,15 @@ const NAV_ITEMS = [
 ];
 
 const pillClass = (active) =>
-  `flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
-    active ? "bg-accent-purple text-white" : "text-text-muted hover:bg-white/5 hover:text-text-primary"
+  `flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm font-semibold shadow-2xl backdrop-blur-md transition ${
+    active
+      ? "border-accent-purple bg-accent-purple text-white"
+      : "border-white/10 bg-surface/90 text-text-muted hover:bg-white/10 hover:text-text-primary"
   }`;
 
 export default function TopNavPill({ avlbFlatsActive = false, onAvlbFlatsClick }) {
   return (
-    <nav className="flex flex-wrap items-center justify-center gap-1 rounded-full border border-white/10 bg-surface/90 p-1.5 shadow-2xl backdrop-blur-md">
+    <nav className="flex flex-wrap items-center justify-center gap-2">
       {NAV_ITEMS.map((item) => {
         const Icon = item.icon;
 

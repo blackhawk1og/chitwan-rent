@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker } from "react-leaflet";
 import { Compass, KeyRound, Search, Ruler } from "lucide-react";
@@ -102,7 +102,7 @@ export default function MapShell() {
   const [satelliteOn, setSatelliteOn] = useState(false);
   const [busRoutesOn, setBusRoutesOn] = useState(false);
   const [schoolsOn, setSchoolsOn] = useState(false);
-  const [greenCoverOn, setGreenCoverOn] = useState(false);
+  const [showSeekers, setShowSeekers] = useState(false);
 
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const filterCount = countActiveFilters(filters);
@@ -216,6 +216,32 @@ export default function MapShell() {
         onCancel: closeRouteModal,
       }
     : null;
+
+  // The nav pill row (row 2) sizes to its own content and centers within its
+  // wide wrapper — the search+filter row (row 1) fills its wrapper edge to
+  // edge. To line up their visible edges without touching TopNavPill's own
+  // layout, measure the pill row's actual rendered width and cap row 1 to
+  // match it. Re-measures on resize since pill labels hide below `sm`.
+  const navRowWrapperRef = useRef(null);
+  const [navRowWidth, setNavRowWidth] = useState(null);
+
+  useLayoutEffect(() => {
+    if (topBarStatus) return; // nav pills aren't rendered while a status banner is showing
+    const wrapper = navRowWrapperRef.current;
+    const navEl = wrapper?.querySelector("nav");
+    if (!navEl) return;
+
+    const measure = () => setNavRowWidth(navEl.getBoundingClientRect().width);
+    measure();
+
+    const resizeObserver = new ResizeObserver(measure);
+    resizeObserver.observe(navEl);
+    window.addEventListener("resize", measure);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [topBarStatus]);
 
   const handleSubmitFlatForm = async (form) => {
     if (!listFlatFlow.draftPin) return;
@@ -416,10 +442,12 @@ export default function MapShell() {
         {!pinsHidden && (
           <>
             <FlatsLayer flats={displayedFlats} onSelect={(flat) => setExpandedItem({ type: "flat", data: flat })} />
-            <SeekersLayer
-              seekerPins={displayedSeekerPins}
-              onSelect={(seeker) => setSelectedItem({ type: "seeker", data: seeker })}
-            />
+            {showSeekers && (
+              <SeekersLayer
+                seekerPins={displayedSeekerPins}
+                onSelect={(seeker) => setSelectedItem({ type: "seeker", data: seeker })}
+              />
+            )}
             <ToletSpotsLayer spots={displayedToletSpots} />
             {schoolsOn && <PoisLayer pois={schoolPois} />}
           </>
@@ -457,16 +485,15 @@ export default function MapShell() {
         )}
       </MapContainer>
 
-      {greenCoverOn && (
-        <div className="pointer-events-none absolute inset-0 z-[10] bg-emerald-500/10" />
-      )}
-
       <div
         className={`pointer-events-none absolute inset-x-0 z-[1000] flex flex-col items-center gap-2 px-4 ${
           pushDown ? "top-16" : "top-4"
         }`}
       >
-        <div className="pointer-events-auto w-full max-w-2xl">
+        <div
+          className="pointer-events-auto w-full max-w-3xl"
+          style={!topBarStatus && navRowWidth ? { maxWidth: `${navRowWidth}px` } : undefined}
+        >
           {topBarStatus ? (
             <StatusBanner
               accent={topBarStatus.accent}
@@ -486,7 +513,7 @@ export default function MapShell() {
           )}
         </div>
 
-        <div className="pointer-events-auto flex w-full max-w-2xl justify-center">
+        <div ref={navRowWrapperRef} className="pointer-events-auto flex w-full max-w-3xl justify-center">
           {topBarStatus ? (
             <SearchBar
               value={searchValue}
@@ -512,8 +539,8 @@ export default function MapShell() {
             onToggleSchools={() => setSchoolsOn((v) => !v)}
             satelliteOn={satelliteOn}
             onToggleSatellite={() => setSatelliteOn((v) => !v)}
-            greenCoverOn={greenCoverOn}
-            onToggleGreenCover={() => setGreenCoverOn((v) => !v)}
+            showSeekers={showSeekers}
+            onToggleSeekers={() => setShowSeekers((v) => !v)}
             onMore={() => setQuickModal("more")}
           />
         </div>
