@@ -5,7 +5,6 @@ import { Compass, KeyRound, Search, Ruler } from "lucide-react";
 import {
   CHITWAN_CENTER,
   DEFAULT_ZOOM,
-  CHITWAN_BOUNDS,
   DARK_TILE_URL,
   DARK_TILE_ATTRIBUTION,
   SATELLITE_TILE_URL,
@@ -444,8 +443,6 @@ export default function MapShell() {
         center={CHITWAN_CENTER}
         zoom={DEFAULT_ZOOM}
         zoomControl={false}
-        maxBounds={CHITWAN_BOUNDS}
-        maxBoundsViscosity={1.0}
         className="absolute inset-0 z-0"
       >
         <MapZoomGuard />
