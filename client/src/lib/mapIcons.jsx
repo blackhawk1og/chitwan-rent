@@ -122,15 +122,27 @@ const GATED_CHIP_BG = {
   not_gated: "#f59e0b",
 };
 
+// Sizing presets for createFlatInfoChipIcon. "base" is the resting compact
+// style shown as soon as individual (unclustered) chips appear; "compact"
+// and "tight" shrink it further as the user zooms in past the thresholds in
+// FlatsLayer's FLAT_CHIP_ZOOM_SCALE, so dense close-up views stay tidy
+// instead of every chip staying full-size.
+const CHIP_SIZE_STYLES = {
+  base: { padY: 4, padX: 8, gap: 5, fontSize: 10, dividerH: 10, anchorX: 44, anchorY: 11 },
+  compact: { padY: 3.5, padX: 7, gap: 4, fontSize: 9.5, dividerH: 9, anchorX: 40, anchorY: 10 },
+  tight: { padY: 3, padX: 6, gap: 4, fontSize: 9, dividerH: 8, anchorX: 36, anchorY: 9 },
+};
+
 // Compact info chip for an individual flat pin: "3BHK · 29.2K · ★ 4.0" in one row.
-export function createFlatInfoChipIcon({ bhk, rent, rating, gated }) {
+export function createFlatInfoChipIcon({ bhk, rent, rating, gated, sizeTier = "base" }) {
   const bhkLabel = bhk >= 5 ? "5+" : bhk;
   const priceLabel = `${(rent / 1000).toFixed(1)}K`;
   const ratingLabel = rating != null ? Number(rating).toFixed(1) : "—";
   const background = GATED_CHIP_BG[gated] ?? "rgba(17,18,32,0.96)";
+  const s = CHIP_SIZE_STYLES[sizeTier] ?? CHIP_SIZE_STYLES.base;
 
   const divider = (
-    <span style={{ width: 1, height: 12, background: "rgba(255,255,255,0.18)", flexShrink: 0 }} />
+    <span style={{ width: 1, height: s.dividerH, background: "rgba(255,255,255,0.18)", flexShrink: 0 }} />
   );
 
   const html = renderToStaticMarkup(
@@ -138,8 +150,8 @@ export function createFlatInfoChipIcon({ bhk, rent, rating, gated }) {
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 6,
-        padding: "6px 10px",
+        gap: s.gap,
+        padding: `${s.padY}px ${s.padX}px`,
         borderRadius: 9999,
         background,
         border: "1px solid rgba(255,255,255,0.12)",
@@ -148,11 +160,11 @@ export function createFlatInfoChipIcon({ bhk, rent, rating, gated }) {
         whiteSpace: "nowrap",
       }}
     >
-      <span style={{ fontSize: 11, fontWeight: 800, color: "#ffffff" }}>{bhkLabel}BHK</span>
+      <span style={{ fontSize: s.fontSize, fontWeight: 800, color: "#ffffff" }}>{bhkLabel}BHK</span>
       {divider}
-      <span style={{ fontSize: 11, fontWeight: 800, color: "#ffffff" }}>{priceLabel}</span>
+      <span style={{ fontSize: s.fontSize, fontWeight: 800, color: "#ffffff" }}>{priceLabel}</span>
       {divider}
-      <span style={{ fontSize: 11, fontWeight: 800, color: "#facc15" }}>★ {ratingLabel}</span>
+      <span style={{ fontSize: s.fontSize, fontWeight: 800, color: "#facc15" }}>★ {ratingLabel}</span>
     </div>
   );
 
@@ -160,7 +172,7 @@ export function createFlatInfoChipIcon({ bhk, rent, rating, gated }) {
     html,
     className: "chitwan-pin-icon",
     iconSize: null,
-    iconAnchor: [50, 14],
+    iconAnchor: [s.anchorX, s.anchorY],
   });
 }
 
