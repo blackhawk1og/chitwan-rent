@@ -2,12 +2,12 @@ import { X } from "lucide-react";
 
 export default function Modal({ onClose, children, maxWidthClass = "max-w-md" }) {
   return (
-    <div
-      className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4" onClick={onClose}>
+      {/* Blur lives on its own overlay layer only — never on an ancestor of
+          the card — so the card content itself always renders sharp. */}
+      <div className="absolute inset-0 z-0 bg-black/60 backdrop-blur-sm" />
       <div
-        className={`relative max-h-[85vh] w-full ${maxWidthClass} overflow-y-auto rounded-3xl border border-white/10 bg-surface p-6 shadow-2xl`}
+        className={`relative z-10 max-h-[85vh] w-full ${maxWidthClass} overflow-y-auto rounded-3xl border border-white/10 bg-surface p-6 shadow-2xl`}
         onClick={(e) => e.stopPropagation()}
       >
         <button

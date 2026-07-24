@@ -115,11 +115,19 @@ export function createLabeledPoiIcon(IconComponent, label, { bg = "#38bdf8" } = 
   });
 }
 
+// Marker background by gated status: blue for gated societies, orange for
+// not gated. Falls back to the neutral dark chip when gated status is unset.
+const GATED_CHIP_BG = {
+  gated: "#3b82f6",
+  not_gated: "#f59e0b",
+};
+
 // Compact info chip for an individual flat pin: "3BHK · 29.2K · ★ 4.0" in one row.
-export function createFlatInfoChipIcon({ bhk, rent, rating }) {
+export function createFlatInfoChipIcon({ bhk, rent, rating, gated }) {
   const bhkLabel = bhk >= 5 ? "5+" : bhk;
   const priceLabel = `${(rent / 1000).toFixed(1)}K`;
   const ratingLabel = rating != null ? Number(rating).toFixed(1) : "—";
+  const background = GATED_CHIP_BG[gated] ?? "rgba(17,18,32,0.96)";
 
   const divider = (
     <span style={{ width: 1, height: 12, background: "rgba(255,255,255,0.18)", flexShrink: 0 }} />
@@ -133,7 +141,7 @@ export function createFlatInfoChipIcon({ bhk, rent, rating }) {
         gap: 6,
         padding: "6px 10px",
         borderRadius: 9999,
-        background: "rgba(17,18,32,0.96)",
+        background,
         border: "1px solid rgba(255,255,255,0.12)",
         boxShadow: "0 3px 10px rgba(0,0,0,0.45)",
         fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",

@@ -21,7 +21,7 @@ export default function FlatsLayer({ flats, onSelect }) {
       Object.fromEntries(
         flats.map((flat) => [
           flat.id,
-          createFlatInfoChipIcon({ bhk: flat.bhk, rent: flat.rent, rating: flat.rating }),
+          createFlatInfoChipIcon({ bhk: flat.bhk, rent: flat.rent, rating: flat.rating, gated: flat.gated }),
         ])
       ),
     [flats]
