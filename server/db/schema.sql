@@ -2,6 +2,7 @@
 DROP TABLE IF EXISTS flat_comments CASCADE;
 DROP TABLE IF EXISTS flat_ratings CASCADE;
 DROP TABLE IF EXISTS flat_interests CASCADE;
+DROP TABLE IF EXISTS rent_reports CASCADE;
 DROP TABLE IF EXISTS tolet_spots CASCADE;
 DROP TABLE IF EXISTS seeker_pins CASCADE;
 DROP TABLE IF EXISTS flats CASCADE;
@@ -131,3 +132,18 @@ CREATE TABLE pois (
   lat DOUBLE PRECISION,
   lng DOUBLE PRECISION
 );
+
+-- Anonymous rent data points from the empty-map "Add something here" quick
+-- action — no owner_id/user_id by design. Feeds future Area Stats
+-- aggregation alongside real flat listings.
+CREATE TABLE rent_reports (
+  id SERIAL PRIMARY KEY,
+  lat DOUBLE PRECISION,
+  lng DOUBLE PRECISION,
+  rent INT,
+  bhk INT,
+  gated TEXT CHECK (gated IN ('gated','not_gated')),
+  created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE INDEX idx_rent_reports_lat_lng ON rent_reports(lat, lng);

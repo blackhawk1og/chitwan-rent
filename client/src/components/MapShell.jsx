@@ -10,6 +10,7 @@ import {
   SATELLITE_TILE_URL,
   SATELLITE_ATTRIBUTION,
 } from "../lib/mapConfig.js";
+import { haversineMeters } from "../lib/geo.js";
 import { useFlats } from "../hooks/useFlats.js";
 import { useSeekerPins } from "../hooks/useSeekerPins.js";
 import { useAreas } from "../hooks/useAreas.js";
@@ -19,6 +20,7 @@ import { usePois } from "../hooks/usePois.js";
 import { useCreateFlat } from "../hooks/useCreateFlat.js";
 import { useCreateSeekerPin } from "../hooks/useCreateSeekerPin.js";
 import { useCreateToletSpot } from "../hooks/useCreateToletSpot.js";
+import { useCreateRentReport } from "../hooks/useCreateRentReport.js";
 import { usePinDropFlow } from "../hooks/usePinDropFlow.js";
 import { formatRs } from "../lib/format.js";
 import { DEFAULT_FILTERS, countActiveFilters } from "../lib/filters.js";
@@ -40,6 +42,10 @@ import MapZoomGuard from "./MapZoomGuard.jsx";
 import PinDropBanner from "./PinDropBanner.jsx";
 import StatusBanner from "./StatusBanner.jsx";
 import PinDropCatcher from "./PinDropCatcher.jsx";
+import EmptyTapCatcher from "./EmptyTapCatcher.jsx";
+import QuickActionModal from "./QuickActionModal.jsx";
+import RentReportForm from "./RentReportForm.jsx";
+import OutOfBoundsModal from "./OutOfBoundsModal.jsx";
 import AddFlatForm from "./AddFlatForm.jsx";
 import DropSeekerPinForm from "./DropSeekerPinForm.jsx";
 import SpotToLetModal from "./SpotToLetModal.jsx";
@@ -81,6 +87,10 @@ const AREA_STATS_STEPS = [
 // across Avlb Flats / List My Flat / Find a Flat) reference this one class
 // instead of each hardcoding their own max-width.
 const TOP_BAR_ROW_MAX_WIDTH_CLASS = "max-w-3xl";
+
+// Pin drops more than this far from Chitwan center get blocked with
+// OutOfBoundsModal instead of proceeding into a form.
+const MAX_PIN_DISTANCE_METERS = 100_000;
 
 const draftFlatIcon = createDotIcon(KeyRound, { bg: "#7c3aed", size: 32 });
 const draftSeekerIcon = createDotIcon(Search, { bg: "#14b8a6", size: 32 });
@@ -127,6 +137,34 @@ export default function MapShell() {
   const createFlat = useCreateFlat();
   const createSeekerPin = useCreateSeekerPin();
   const createToletSpot = useCreateToletSpot();
+  const createRentReport = useCreateRentReport();
+
+  // Empty-map-tap quick action chooser: { step: 'chooser' | 'rent-report', lat, lng } | null
+  const [quickAction, setQuickAction] = useState(null);
+
+  // Out-of-bounds pin guard (List My Flat / Find a Flat / Spot a To-Let, both
+  // via direct pin-drop and via the quick action chooser). Holds the "cancel"
+  // callback appropriate to whichever flow triggered it — clicking "Got it"
+  // runs it, returning to normal map state exactly like a pin-drop Cancel.
+  const [outOfBoundsCancel, setOutOfBoundsCancel] = useState(null);
+
+  const isWithinChitwan = (lat, lng) =>
+    haversineMeters(lat, lng, CHITWAN_CENTER[0], CHITWAN_CENTER[1]) <= MAX_PIN_DISTANCE_METERS;
+
+  // Runs a pin-drop callback if the coordinate is within range, otherwise
+  // shows OutOfBoundsModal and stashes cancelAction for its "Got it" button.
+  const guardPinDrop = (latlng, cancelAction, onValid) => {
+    if (isWithinChitwan(latlng.lat, latlng.lng)) {
+      onValid(latlng);
+    } else {
+      setOutOfBoundsCancel(() => cancelAction);
+    }
+  };
+
+  const dismissOutOfBounds = () => {
+    outOfBoundsCancel?.();
+    setOutOfBoundsCancel(null);
+  };
 
   const listFlatFlow = usePinDropFlow({
     routePath: "/list-my-flat",
@@ -162,6 +200,11 @@ export default function MapShell() {
   // Only Spot-a-To-Let and Area Stats still use the full-width top PinDropBanner
   // strip — List My Flat / Find a Flat pin-drop now render inline via topBarStatus.
   const pushDown = toletPicking || areaStatsDrawing;
+  // Whenever a flow already has its own PinDropCatcher mounted and awaiting a
+  // tap-to-place-pin, that takes priority — the empty-tap quick action
+  // chooser must not compete with it for the same map click.
+  const mapClickCaptured =
+    listFlatFlow.step === "pin-drop" || findFlatFlow.step === "pin-drop" || toletPicking || areaStatsDrawing;
 
   const displayedFlats = useMemo(() => {
     if (!justSubmittedFlats.length) return flats;
@@ -186,6 +229,59 @@ export default function MapShell() {
 
   const handleSelectLocation = (suggestion) => {
     mapRef.current?.flyTo([suggestion.lat, suggestion.lng], 15, { duration: 1.2 });
+  };
+
+  // Empty-map-tap quick action chooser and its four destinations. The
+  // distance check runs at tap time, before the chooser ever opens — an
+  // out-of-bounds tap shows OutOfBoundsModal directly and never shows the
+  // chooser at all. Because of that, by the time quickAction is set (and the
+  // handlers below run), the location is already confirmed valid.
+  const handleEmptyMapTap = (latlng) => {
+    guardPinDrop(
+      latlng,
+      () => {},
+      (pos) => setQuickAction({ step: "chooser", lat: pos.lat, lng: pos.lng })
+    );
+  };
+
+  const handleQuickActionListFlat = () => {
+    if (!quickAction) return;
+    listFlatFlow.startWithPin(quickAction.lat, quickAction.lng);
+    setQuickAction(null);
+    navigate("/list-my-flat");
+  };
+
+  const handleQuickActionFindFlat = () => {
+    if (!quickAction) return;
+    findFlatFlow.startWithPin(quickAction.lat, quickAction.lng);
+    setQuickAction(null);
+    navigate("/find-a-flat");
+  };
+
+  const handleQuickActionSpotToLet = () => {
+    if (!quickAction) return;
+    const { lat, lng } = quickAction;
+    setQuickAction(null);
+    withAuth(() => {
+      setToletLocation({ lat, lng });
+      setQuickModal("spot-a-tolet");
+    });
+  };
+
+  const handleSubmitRentReport = async (form) => {
+    if (!quickAction) return;
+    try {
+      await createRentReport.mutateAsync({
+        rent: Number(form.rent),
+        bhk: form.bhk,
+        gated: form.gated,
+        lat: quickAction.lat,
+        lng: quickAction.lng,
+      });
+      setQuickAction(null);
+    } catch {
+      // error surfaced via createRentReport.isError in the form
+    }
   };
 
   // Briefly pulses the filter button when Avlb Flats auto-applies its filter,
@@ -475,9 +571,15 @@ export default function MapShell() {
           <AreaRectangleLayer bounds={areaBounds} onCornerDrag={handleAreaCornerDrag} />
         )}
 
-        {toletPicking && <PinDropCatcher onPlace={handlePlaceToletPin} />}
+        {toletPicking && (
+          <PinDropCatcher
+            onPlace={(latlng) => guardPinDrop(latlng, () => setToletPicking(false), handlePlaceToletPin)}
+          />
+        )}
 
-        {listFlatFlow.step === "pin-drop" && <PinDropCatcher onPlace={listFlatFlow.placePin} />}
+        {listFlatFlow.step === "pin-drop" && (
+          <PinDropCatcher onPlace={(latlng) => guardPinDrop(latlng, closeRouteModal, listFlatFlow.placePin)} />
+        )}
         {listFlatFlow.step === "form" && listFlatFlow.draftPin && (
           <Marker
             position={[listFlatFlow.draftPin.lat, listFlatFlow.draftPin.lng]}
@@ -487,7 +589,9 @@ export default function MapShell() {
           />
         )}
 
-        {findFlatFlow.step === "pin-drop" && <PinDropCatcher onPlace={findFlatFlow.placePin} />}
+        {findFlatFlow.step === "pin-drop" && (
+          <PinDropCatcher onPlace={(latlng) => guardPinDrop(latlng, closeRouteModal, findFlatFlow.placePin)} />
+        )}
         {findFlatFlow.step === "form" && findFlatFlow.draftPin && (
           <Marker
             position={[findFlatFlow.draftPin.lat, findFlatFlow.draftPin.lng]}
@@ -496,6 +600,8 @@ export default function MapShell() {
             eventHandlers={{ dragend: (e) => findFlatFlow.dragPin(e.target.getLatLng()) }}
           />
         )}
+
+        {!mapClickCaptured && !quickAction && <EmptyTapCatcher onEmptyTap={handleEmptyMapTap} />}
       </MapContainer>
 
       <div
@@ -589,7 +695,7 @@ export default function MapShell() {
       {listFlatFlow.step === "onboarding" && (
         <OnboardingModal
           onClose={closeRouteModal}
-          onCta={() => listFlatFlow.setStep("pin-drop")}
+          onCta={listFlatFlow.proceedAfterOnboarding}
           dontShowAgainKey="list-my-flat"
           icon={KeyRound}
           title="Here's how it works"
@@ -614,7 +720,7 @@ export default function MapShell() {
       {findFlatFlow.step === "onboarding" && (
         <OnboardingModal
           onClose={closeRouteModal}
-          onCta={() => findFlatFlow.setStep("pin-drop")}
+          onCta={findFlatFlow.proceedAfterOnboarding}
           dontShowAgainKey="find-a-flat"
           icon={Search}
           title="Here's how it works"
@@ -741,6 +847,27 @@ export default function MapShell() {
           onClose={closeQuickModal}
         />
       )}
+
+      {quickAction?.step === "chooser" && (
+        <QuickActionModal
+          onClose={() => setQuickAction(null)}
+          onSelectRentReport={() => setQuickAction((qa) => ({ ...qa, step: "rent-report" }))}
+          onSelectListFlat={handleQuickActionListFlat}
+          onSelectFindFlat={handleQuickActionFindFlat}
+          onSelectSpotToLet={handleQuickActionSpotToLet}
+        />
+      )}
+
+      {quickAction?.step === "rent-report" && (
+        <RentReportForm
+          onCancel={() => setQuickAction(null)}
+          onSubmit={handleSubmitRentReport}
+          submitting={createRentReport.isPending}
+          submitError={createRentReport.isError ? "Something went wrong — please try again." : null}
+        />
+      )}
+
+      {outOfBoundsCancel && <OutOfBoundsModal onClose={dismissOutOfBounds} />}
 
       {selectedItem?.type === "seeker" && (
         <ListingChip
