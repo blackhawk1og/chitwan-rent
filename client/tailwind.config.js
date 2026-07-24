@@ -22,6 +22,15 @@ export default {
       borderColor: {
         DEFAULT: "rgba(255,255,255,0.08)",
       },
+      keyframes: {
+        "attention-pulse": {
+          "0%, 100%": { boxShadow: "0 0 0 0 rgba(124,58,237,0.65)", transform: "scale(1)" },
+          "50%": { boxShadow: "0 0 0 8px rgba(124,58,237,0)", transform: "scale(1.08)" },
+        },
+      },
+      animation: {
+        "attention-pulse": "attention-pulse 0.6s ease-in-out 3",
+      },
     },
   },
   plugins: [],

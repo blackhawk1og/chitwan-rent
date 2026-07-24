@@ -45,7 +45,6 @@ import AddFlatForm from "./AddFlatForm.jsx";
 import DropSeekerPinForm from "./DropSeekerPinForm.jsx";
 import SpotToLetModal from "./SpotToLetModal.jsx";
 import SuperheroesModal from "./SuperheroesModal.jsx";
-import SuperheroesPage from "./SuperheroesPage.jsx";
 import MoreModal from "./MoreModal.jsx";
 import AreaRectangleLayer from "./AreaRectangleLayer.jsx";
 import AreaStatsResultsModal from "./AreaStatsResultsModal.jsx";
@@ -77,6 +76,12 @@ const AREA_STATS_STEPS = [
   "Tap again to set the opposite corner",
   "Adjust the box, then tap View Stats →",
 ];
+
+// Single source of truth for the top-bar cluster's box width — both the
+// search+filter row and the status banner (which occupies the same slot
+// across Avlb Flats / List My Flat / Find a Flat) reference this one class
+// instead of each hardcoding their own max-width.
+const TOP_BAR_ROW_MAX_WIDTH_CLASS = "max-w-3xl";
 
 const draftFlatIcon = createDotIcon(KeyRound, { bg: "#7c3aed", size: 32 });
 const draftSeekerIcon = createDotIcon(Search, { bg: "#14b8a6", size: 32 });
@@ -184,9 +189,20 @@ export default function MapShell() {
     mapRef.current?.flyTo([suggestion.lat, suggestion.lng], 15, { duration: 1.2 });
   };
 
+  // Briefly pulses the filter button when Avlb Flats auto-applies its filter,
+  // drawing the eye to the badge count that just changed. Finite (CSS
+  // iteration-count: 3), not a permanent loop — cleared via timeout.
+  const [filterPulse, setFilterPulse] = useState(false);
+  const filterPulseTimeoutRef = useRef(null);
+
   const handleAvlbFlatsClick = () => {
     if (location.pathname !== "/") navigate("/");
     setFilters((f) => ({ ...f, availableOnly: true }));
+
+    if (filterPulseTimeoutRef.current) clearTimeout(filterPulseTimeoutRef.current);
+    setFilterPulse(false);
+    requestAnimationFrame(() => requestAnimationFrame(() => setFilterPulse(true)));
+    filterPulseTimeoutRef.current = setTimeout(() => setFilterPulse(false), 2000);
   };
 
   const handleCancelAvlbFlats = () => {
@@ -217,18 +233,18 @@ export default function MapShell() {
       }
     : null;
 
-  // The nav pill row (row 2) sizes to its own content and centers within its
-  // wide wrapper — the search+filter row (row 1) fills its wrapper edge to
-  // edge. To line up their visible edges without touching TopNavPill's own
-  // layout, measure the pill row's actual rendered width and cap row 1 to
-  // match it. Re-measures on resize since pill labels hide below `sm`.
-  const navRowWrapperRef = useRef(null);
+  // The nav pill row sizes to its own content rather than filling its
+  // wrapper — every other row (default search bar, status banner, and the
+  // search bar shown once a banner is active) should match that same width
+  // instead of each stretching to fill max-w-3xl independently. A hidden
+  // clone of TopNavPill is kept mounted at all times (even while a banner
+  // hides the real one) purely so its width can always be measured, at any
+  // viewport size, regardless of which row is currently visible.
+  const navMeasureRef = useRef(null);
   const [navRowWidth, setNavRowWidth] = useState(null);
 
   useLayoutEffect(() => {
-    if (topBarStatus) return; // nav pills aren't rendered while a status banner is showing
-    const wrapper = navRowWrapperRef.current;
-    const navEl = wrapper?.querySelector("nav");
+    const navEl = navMeasureRef.current?.querySelector("nav");
     if (!navEl) return;
 
     const measure = () => setNavRowWidth(navEl.getBoundingClientRect().width);
@@ -241,7 +257,7 @@ export default function MapShell() {
       resizeObserver.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [topBarStatus]);
+  }, []);
 
   const handleSubmitFlatForm = async (form) => {
     if (!listFlatFlow.draftPin) return;
@@ -490,9 +506,17 @@ export default function MapShell() {
           pushDown ? "top-16" : "top-4"
         }`}
       >
+        {/* Hidden always-mounted clone, purely so the nav pill row's natural
+            width can be measured at any time/viewport, even while a banner
+            replaces the visible nav row. Every row below shares this one
+            navRowWidth value instead of sizing independently. */}
+        <div ref={navMeasureRef} className="pointer-events-none invisible absolute left-0 top-0" aria-hidden="true">
+          <TopNavPill avlbFlatsActive={filters.availableOnly} onAvlbFlatsClick={() => {}} />
+        </div>
+
         <div
-          className="pointer-events-auto w-full max-w-3xl"
-          style={!topBarStatus && navRowWidth ? { maxWidth: `${navRowWidth}px` } : undefined}
+          className={`pointer-events-auto w-full ${TOP_BAR_ROW_MAX_WIDTH_CLASS}`}
+          style={navRowWidth ? { maxWidth: `${navRowWidth}px` } : undefined}
         >
           {topBarStatus ? (
             <StatusBanner
@@ -509,11 +533,15 @@ export default function MapShell() {
               onSelectLocation={handleSelectLocation}
               onFilterClick={() => setQuickModal("filters")}
               filterCount={filterCount}
+              pulseFilter={filterPulse}
             />
           )}
         </div>
 
-        <div ref={navRowWrapperRef} className="pointer-events-auto flex w-full max-w-3xl justify-center">
+        <div
+          className={`pointer-events-auto flex w-full ${TOP_BAR_ROW_MAX_WIDTH_CLASS} justify-center`}
+          style={navRowWidth ? { maxWidth: `${navRowWidth}px` } : undefined}
+        >
           {topBarStatus ? (
             <SearchBar
               value={searchValue}
@@ -522,6 +550,7 @@ export default function MapShell() {
               onSelectLocation={handleSelectLocation}
               onFilterClick={() => setQuickModal("filters")}
               filterCount={filterCount}
+              pulseFilter={filterPulse}
             />
           ) : (
             <TopNavPill avlbFlatsActive={filters.availableOnly} onAvlbFlatsClick={handleAvlbFlatsClick} />
@@ -607,7 +636,15 @@ export default function MapShell() {
         />
       )}
 
-      {location.pathname === "/superheroes" && <SuperheroesPage onClose={closeRouteModal} />}
+      {location.pathname === "/superheroes" && (
+        <SuperheroesModal
+          onClose={closeRouteModal}
+          onSpotToLet={() => {
+            closeRouteModal();
+            withAuth(() => setQuickModal("spot-a-tolet"));
+          }}
+        />
+      )}
 
       {pendingAuthAction && (
         <AuthGateModal

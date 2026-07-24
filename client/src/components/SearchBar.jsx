@@ -28,6 +28,7 @@ export default function SearchBar({
   onSelectLocation,
   onFilterClick,
   filterCount = 0,
+  pulseFilter = false,
 }) {
   const [focused, setFocused] = useState(false);
   const [nominatimResults, setNominatimResults] = useState([]);
@@ -115,7 +116,9 @@ export default function SearchBar({
         type="button"
         onClick={onFilterClick}
         aria-label="Filters"
-        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-surface/90 text-text-primary shadow-2xl backdrop-blur-md transition hover:bg-white/10"
+        className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-surface/90 text-text-primary shadow-2xl backdrop-blur-md transition hover:bg-white/10 ${
+          pulseFilter ? "animate-attention-pulse" : ""
+        }`}
       >
         <SlidersHorizontal size={16} />
         {filterCount > 0 && (
