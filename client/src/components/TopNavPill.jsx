@@ -14,13 +14,9 @@ const pillClass = (active) =>
     active ? "bg-accent-purple text-white" : "text-text-muted hover:bg-white/5 hover:text-text-primary"
   }`;
 
-export default function TopNavPill({ pushDown = false, avlbFlatsActive = false, onAvlbFlatsClick }) {
+export default function TopNavPill({ avlbFlatsActive = false, onAvlbFlatsClick }) {
   return (
-    <nav
-      className={`absolute left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/10 bg-surface/90 p-1.5 shadow-2xl backdrop-blur-md ${
-        pushDown ? "top-36 sm:top-16" : "top-20 sm:top-4"
-      }`}
-    >
+    <nav className="flex flex-wrap items-center justify-center gap-1 rounded-full border border-white/10 bg-surface/90 p-1.5 shadow-2xl backdrop-blur-md">
       {NAV_ITEMS.map((item) => {
         const Icon = item.icon;
 

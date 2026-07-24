@@ -39,7 +39,7 @@ import FlatDetailPanel from "./FlatDetailPanel.jsx";
 import SeekerDetailCard from "./SeekerDetailCard.jsx";
 import MapZoomGuard from "./MapZoomGuard.jsx";
 import PinDropBanner from "./PinDropBanner.jsx";
-import AvlbFlatsBanner from "./AvlbFlatsBanner.jsx";
+import StatusBanner from "./StatusBanner.jsx";
 import PinDropCatcher from "./PinDropCatcher.jsx";
 import AddFlatForm from "./AddFlatForm.jsx";
 import DropSeekerPinForm from "./DropSeekerPinForm.jsx";
@@ -155,7 +155,9 @@ export default function MapShell() {
   const [areaStatsType, setAreaStatsType] = useState("all");
 
   const areaStatsDrawing = areaStatsStep === "drawing" || areaStatsStep === "adjusting";
-  const pushDown = listFlatFlow.step === "pin-drop" || findFlatFlow.step === "pin-drop" || toletPicking || areaStatsDrawing;
+  // Only Spot-a-To-Let and Area Stats still use the full-width top PinDropBanner
+  // strip — List My Flat / Find a Flat pin-drop now render inline via topBarStatus.
+  const pushDown = toletPicking || areaStatsDrawing;
 
   const displayedFlats = useMemo(() => {
     if (!justSubmittedFlats.length) return flats;
@@ -190,6 +192,30 @@ export default function MapShell() {
   const handleCancelAvlbFlats = () => {
     setFilters((f) => ({ ...f, availableOnly: false }));
   };
+
+  // Drives the shared collapsed top-bar layout: when set, the nav pill row is
+  // replaced by a status banner and the search+filter row moves underneath it.
+  // Same slot for all three flows — only the content differs.
+  const topBarStatus = filters.availableOnly
+    ? {
+        accent: "teal",
+        title: "🏠 Now showing all available flats",
+        subtitle: "Tap Cancel or clear from Filters ↗",
+        onCancel: handleCancelAvlbFlats,
+      }
+    : listFlatFlow.step === "pin-drop"
+    ? {
+        accent: "purple",
+        title: "👆 Tap your flat's location on the map to place your pin",
+        onCancel: closeRouteModal,
+      }
+    : findFlatFlow.step === "pin-drop"
+    ? {
+        accent: "teal",
+        title: "👆 Tap anywhere on the map to place your pin",
+        onCancel: closeRouteModal,
+      }
+    : null;
 
   const handleSubmitFlatForm = async (form) => {
     if (!listFlatFlow.draftPin) return;
@@ -435,30 +461,48 @@ export default function MapShell() {
         <div className="pointer-events-none absolute inset-0 z-[10] bg-emerald-500/10" />
       )}
 
+      <div
+        className={`pointer-events-none absolute inset-x-0 z-[1000] flex flex-col items-center gap-2 px-4 ${
+          pushDown ? "top-16" : "top-4"
+        }`}
+      >
+        <div className="pointer-events-auto w-full max-w-2xl">
+          {topBarStatus ? (
+            <StatusBanner
+              accent={topBarStatus.accent}
+              title={topBarStatus.title}
+              subtitle={topBarStatus.subtitle}
+              onCancel={topBarStatus.onCancel}
+            />
+          ) : (
+            <SearchBar
+              value={searchValue}
+              onChange={setSearchValue}
+              areas={areas}
+              onSelectLocation={handleSelectLocation}
+              onFilterClick={() => setQuickModal("filters")}
+              filterCount={filterCount}
+            />
+          )}
+        </div>
+
+        <div className="pointer-events-auto flex w-full max-w-2xl justify-center">
+          {topBarStatus ? (
+            <SearchBar
+              value={searchValue}
+              onChange={setSearchValue}
+              areas={areas}
+              onSelectLocation={handleSelectLocation}
+              onFilterClick={() => setQuickModal("filters")}
+              filterCount={filterCount}
+            />
+          ) : (
+            <TopNavPill avlbFlatsActive={filters.availableOnly} onAvlbFlatsClick={handleAvlbFlatsClick} />
+          )}
+        </div>
+      </div>
+
       <div className="pointer-events-none absolute inset-0 z-[1000]">
-        <div className="pointer-events-auto">
-          <TopNavPill
-            pushDown={pushDown}
-            avlbFlatsActive={filters.availableOnly}
-            onAvlbFlatsClick={handleAvlbFlatsClick}
-          />
-        </div>
-        <div className="pointer-events-auto">
-          <SearchBar
-            value={searchValue}
-            onChange={setSearchValue}
-            areas={areas}
-            onSelectLocation={handleSelectLocation}
-            onFilterClick={() => setQuickModal("filters")}
-            filterCount={filterCount}
-            pushDown={pushDown}
-          />
-        </div>
-        {filters.availableOnly && (
-          <div className="pointer-events-auto">
-            <AvlbFlatsBanner onCancel={handleCancelAvlbFlats} />
-          </div>
-        )}
         <div className="pointer-events-auto">
           <IconStack
             onSpotToLet={() => withAuth(() => setQuickModal("spot-a-tolet"))}
@@ -500,14 +544,6 @@ export default function MapShell() {
         />
       )}
 
-      {listFlatFlow.step === "pin-drop" && (
-        <PinDropBanner
-          text="👆 Tap your flat's location on the map to place your pin"
-          accent="purple"
-          onCancel={closeRouteModal}
-        />
-      )}
-
       {listFlatFlow.step === "form" && listFlatFlow.draftPin && (
         <AddFlatForm
           onCancel={listFlatFlow.cancelForm}
@@ -530,14 +566,6 @@ export default function MapShell() {
           icon={Search}
           title="Here's how it works"
           steps={FIND_A_FLAT_STEPS}
-        />
-      )}
-
-      {findFlatFlow.step === "pin-drop" && (
-        <PinDropBanner
-          text="👆 Tap anywhere on the map to place your pin"
-          accent="teal"
-          onCancel={closeRouteModal}
         />
       )}
 
