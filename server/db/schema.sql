@@ -1,4 +1,7 @@
 -- Chitwan Rent — core schema (Phase 0)
+DROP TABLE IF EXISTS flat_comments CASCADE;
+DROP TABLE IF EXISTS flat_ratings CASCADE;
+DROP TABLE IF EXISTS flat_interests CASCADE;
 DROP TABLE IF EXISTS tolet_spots CASCADE;
 DROP TABLE IF EXISTS seeker_pins CASCADE;
 DROP TABLE IF EXISTS flats CASCADE;
@@ -43,6 +46,42 @@ CREATE TABLE flats (
 CREATE INDEX idx_flats_status ON flats(status);
 CREATE INDEX idx_flats_bhk ON flats(bhk);
 CREATE INDEX idx_flats_lat_lng ON flats(lat, lng);
+
+-- Community rating (Phase 10): individual 1-5 star submissions, averaged into flats.rating.
+CREATE TABLE flat_ratings (
+  id SERIAL PRIMARY KEY,
+  flat_id INT REFERENCES flats(id) ON DELETE CASCADE,
+  user_id INT REFERENCES users(id),
+  stars INT CHECK (stars BETWEEN 1 AND 5),
+  created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE INDEX idx_flat_ratings_flat_id ON flat_ratings(flat_id);
+
+-- Comments shown in the flat detail panel's COMMENTS section.
+CREATE TABLE flat_comments (
+  id SERIAL PRIMARY KEY,
+  flat_id INT REFERENCES flats(id) ON DELETE CASCADE,
+  user_id INT REFERENCES users(id),
+  name TEXT,
+  text TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE INDEX idx_flat_comments_flat_id ON flat_comments(flat_id);
+
+-- "I'm interested in this flat" CTA submissions.
+CREATE TABLE flat_interests (
+  id SERIAL PRIMARY KEY,
+  flat_id INT REFERENCES flats(id) ON DELETE CASCADE,
+  user_id INT REFERENCES users(id),
+  name TEXT,
+  contact TEXT,
+  note TEXT,
+  created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE INDEX idx_flat_interests_flat_id ON flat_interests(flat_id);
 
 CREATE TABLE seeker_pins (
   id SERIAL PRIMARY KEY,

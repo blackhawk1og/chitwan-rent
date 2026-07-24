@@ -10,5 +10,13 @@ export const SATELLITE_TILE_URL =
 export const SATELLITE_ATTRIBUTION =
   "Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics";
 
-// Chitwan district, roughly: Bharatpur / Ratnanagar / Khairahani / Kalika / Rapti
+// Chitwan district, roughly: Bharatpur / Ratnanagar / Khairahani / Kalika / Rapti / Ichchhakamana
 export const CHITWAN_NOMINATIM_VIEWBOX = "84.15,27.80,84.65,27.45";
+
+// Same extent as the viewbox above, expressed as a Leaflet LatLngBoundsExpression
+// (southWest, northEast) — single source of truth for both the geocoder viewbox
+// and the map's pan/zoom-out limits.
+export const CHITWAN_BOUNDS = [
+  [27.45, 84.15],
+  [27.8, 84.65],
+];

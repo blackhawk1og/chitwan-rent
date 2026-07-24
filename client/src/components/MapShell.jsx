@@ -5,6 +5,7 @@ import { Compass, KeyRound, Search, Ruler } from "lucide-react";
 import {
   CHITWAN_CENTER,
   DEFAULT_ZOOM,
+  CHITWAN_BOUNDS,
   DARK_TILE_URL,
   DARK_TILE_ATTRIBUTION,
   SATELLITE_TILE_URL,
@@ -20,7 +21,7 @@ import { useCreateFlat } from "../hooks/useCreateFlat.js";
 import { useCreateSeekerPin } from "../hooks/useCreateSeekerPin.js";
 import { useCreateToletSpot } from "../hooks/useCreateToletSpot.js";
 import { usePinDropFlow } from "../hooks/usePinDropFlow.js";
-import { formatRs, bhkLabel } from "../lib/format.js";
+import { formatRs } from "../lib/format.js";
 import { DEFAULT_FILTERS, countActiveFilters } from "../lib/filters.js";
 import { createDotIcon, createHandleIcon } from "../lib/mapIcons.jsx";
 import TopNavPill from "./TopNavPill.jsx";
@@ -34,8 +35,9 @@ import ToletSpotsLayer from "./ToletSpotsLayer.jsx";
 import BusRoutesLayer from "./BusRoutesLayer.jsx";
 import PoisLayer from "./PoisLayer.jsx";
 import ListingChip from "./ListingChip.jsx";
-import FlatDetailCard from "./FlatDetailCard.jsx";
+import FlatDetailPanel from "./FlatDetailPanel.jsx";
 import SeekerDetailCard from "./SeekerDetailCard.jsx";
+import MapZoomGuard from "./MapZoomGuard.jsx";
 import PinDropBanner from "./PinDropBanner.jsx";
 import AvlbFlatsBanner from "./AvlbFlatsBanner.jsx";
 import PinDropCatcher from "./PinDropCatcher.jsx";
@@ -374,8 +376,11 @@ export default function MapShell() {
         center={CHITWAN_CENTER}
         zoom={DEFAULT_ZOOM}
         zoomControl={false}
+        maxBounds={CHITWAN_BOUNDS}
+        maxBoundsViscosity={1.0}
         className="absolute inset-0 z-0"
       >
+        <MapZoomGuard />
         {satelliteOn ? (
           <TileLayer key="satellite" url={SATELLITE_TILE_URL} attribution={SATELLITE_ATTRIBUTION} />
         ) : (
@@ -384,7 +389,7 @@ export default function MapShell() {
 
         {!pinsHidden && (
           <>
-            <FlatsLayer flats={displayedFlats} onSelect={(flat) => setSelectedItem({ type: "flat", data: flat })} />
+            <FlatsLayer flats={displayedFlats} onSelect={(flat) => setExpandedItem({ type: "flat", data: flat })} />
             <SeekersLayer
               seekerPins={displayedSeekerPins}
               onSelect={(seeker) => setSelectedItem({ type: "seeker", data: seeker })}
@@ -648,16 +653,6 @@ export default function MapShell() {
         />
       )}
 
-      {selectedItem?.type === "flat" && (
-        <ListingChip
-          stripColor="#7c3aed"
-          title={`${bhkLabel(selectedItem.data.bhk)} · ${formatRs(selectedItem.data.rent)}`}
-          subtitle={selectedItem.data.area}
-          onExpand={() => setExpandedItem(selectedItem)}
-          onClose={() => setSelectedItem(null)}
-        />
-      )}
-
       {selectedItem?.type === "seeker" && (
         <ListingChip
           stripColor="#14b8a6"
@@ -669,7 +664,7 @@ export default function MapShell() {
       )}
 
       {expandedItem?.type === "flat" && (
-        <FlatDetailCard flat={expandedItem.data} onClose={() => setExpandedItem(null)} />
+        <FlatDetailPanel flat={expandedItem.data} onClose={() => setExpandedItem(null)} />
       )}
 
       {expandedItem?.type === "seeker" && (
