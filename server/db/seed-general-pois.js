@@ -1,15 +1,16 @@
 // One-off, non-destructive regeneration: replaces general-purpose POI rows
-// (restaurants, cafes, hospitals, pharmacies, banks/ATMs, fuel, gyms,
-// temples, hotels, shops) in `pois` with real OSM data fetched from
-// Overpass — safe to run against a dev DB that already has other seeded
-// data, since it only touches rows in these categories (school/college and
-// the dummy landmark entries are left untouched). Run with:
-// npm run seed:general-pois
+// (restaurants, cafes, hospitals, pharmacies, fuel, gyms, temples, hotels,
+// shops) in `pois` with real OSM data fetched from Overpass — safe to run
+// against a dev DB that already has other seeded data, since it only
+// touches rows in these categories (school/college and the dummy landmark
+// entries are left untouched). Bank/ATM are deliberately not in this list —
+// see remove-bank-pois.js for the one-time cleanup of existing rows. Run
+// with: npm run seed:general-pois
 import { pool } from "../src/db.js";
 import { fetchGeneralPois } from "./poisData.js";
 
 const GENERAL_POI_CATEGORIES = [
-  "restaurant", "cafe", "hospital", "clinic", "pharmacy", "bank", "atm", "fuel", "gym", "temple", "hotel", "shop",
+  "restaurant", "cafe", "hospital", "clinic", "pharmacy", "fuel", "gym", "temple", "hotel", "shop",
 ];
 
 async function main() {

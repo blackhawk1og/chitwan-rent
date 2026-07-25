@@ -211,9 +211,10 @@ export async function fetchSchoolsAndColleges() {
 
 // amenity values pulled as-is for the category column; place_of_worship is
 // relabeled to the friendlier "temple" (matches the category name the
-// pre-existing dummy temple entries already use).
+// pre-existing dummy temple entries already use). Deliberately excludes
+// bank/atm — dropped from the POI set entirely.
 const GENERAL_POI_AMENITIES = [
-  "restaurant", "cafe", "hospital", "clinic", "pharmacy", "bank", "atm", "fuel", "gym", "place_of_worship",
+  "restaurant", "cafe", "hospital", "clinic", "pharmacy", "fuel", "gym", "place_of_worship",
 ];
 
 function categorizeElement(tags) {
@@ -225,10 +226,10 @@ function categorizeElement(tags) {
 }
 
 // Pulls general-purpose POIs (restaurants, cafes, hospitals, pharmacies,
-// banks/ATMs, fuel stations, gyms, places of worship, any shop=*, and
-// hotels/guest houses) OSM has tagged inside the Chitwan bbox — everything
-// the dedicated school/college layer doesn't cover. Same shape and dedup
-// pass as fetchSchoolsAndColleges() above.
+// fuel stations, gyms, places of worship, any shop=*, and hotels/guest
+// houses) OSM has tagged inside the Chitwan bbox — everything the dedicated
+// school/college layer doesn't cover. Same shape and dedup pass as
+// fetchSchoolsAndColleges() above.
 export async function fetchGeneralPois() {
   const { south, west, north, east } = CHITWAN_BBOX;
   const bbox = `${south},${west},${north},${east}`;

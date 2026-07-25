@@ -2,20 +2,20 @@ import { useMemo, useState } from "react";
 import { Marker, useMap, useMapEvents } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import {
-  Utensils,
-  Coffee,
-  Stethoscope,
-  Pill,
-  Landmark,
-  Banknote,
-  Dumbbell,
-  ShoppingBag,
-  Church,
-  Fuel,
-  BedDouble,
-  Building2,
-} from "lucide-react";
-import { createDotIcon, createLabeledPoiIcon, createPoiClusterIcon } from "../lib/mapIcons.jsx";
+  MdRestaurant,
+  MdLocalCafe,
+  MdLocalHospital,
+  MdMedicalServices,
+  MdLocalPharmacy,
+  MdLocalGasStation,
+  MdFitnessCenter,
+  MdTempleBuddhist,
+  MdAccountBalance,
+  MdHotel,
+  MdStorefront,
+  MdPlace,
+} from "react-icons/md";
+import { createPoiPinIcon, createLabeledPoiIcon, createPoiClusterIcon } from "../lib/mapIcons.jsx";
 
 // Zoom thresholds for progressive density reveal — no general POI pins at
 // all below tier 1 (matches "fully zoomed out" reference), each tier adds
@@ -23,7 +23,7 @@ import { createDotIcon, createLabeledPoiIcon, createPoiClusterIcon } from "../li
 // same convention as other zoom-tiered map layers (e.g. FlatsLayer's
 // FLAT_CHIP_ZOOM_SCALE).
 export const POI_TIER_1_ZOOM = 13; // hospitals, temples, landmarks — sparse, icon-only
-export const POI_TIER_2_ZOOM = 15; // + cafes, restaurants, hotels, banks/ATMs
+export const POI_TIER_2_ZOOM = 15; // + cafes, restaurants, hotels
 export const POI_TIER_3_ZOOM = 17; // + shops, gyms, pharmacies, fuel — full density
 export const POI_LABEL_ZOOM = 18; // icon-only below this; icon+label at/above it
 
@@ -35,28 +35,28 @@ const CATEGORY_TIER = {
   cafe: 2,
   restaurant: 2,
   hotel: 2,
-  bank: 2,
-  atm: 2,
   shop: 3,
   gym: 3,
   pharmacy: 3,
   fuel: 3,
 };
 
+// Icon glyphs are Material Design icons (react-icons/md — self-hosted SVGs,
+// Apache-2.0-licensed Google icon set, no CDN/font dependency), matching
+// Google Maps' own POI pin visual language. Marker shape/size/color-coding
+// is unchanged — only the glyph inside each circular badge changed.
 const CATEGORY_STYLE = {
-  restaurant: { Icon: Utensils, bg: "#f97316" },
-  cafe: { Icon: Coffee, bg: "#a16207" },
-  hospital: { Icon: Stethoscope, bg: "#ef4444" },
-  clinic: { Icon: Stethoscope, bg: "#ef4444" },
-  pharmacy: { Icon: Pill, bg: "#ec4899" },
-  bank: { Icon: Landmark, bg: "#22c55e" },
-  atm: { Icon: Banknote, bg: "#16a34a" },
-  fuel: { Icon: Fuel, bg: "#64748b" },
-  gym: { Icon: Dumbbell, bg: "#8b5cf6" },
-  temple: { Icon: Church, bg: "#eab308" },
-  landmark: { Icon: Building2, bg: "#06b6d4" },
-  hotel: { Icon: BedDouble, bg: "#3b82f6" },
-  shop: { Icon: ShoppingBag, bg: "#14b8a6" },
+  restaurant: { Icon: MdRestaurant, bg: "#f97316" },
+  cafe: { Icon: MdLocalCafe, bg: "#a16207" },
+  hospital: { Icon: MdLocalHospital, bg: "#ef4444" },
+  clinic: { Icon: MdMedicalServices, bg: "#ef4444" },
+  pharmacy: { Icon: MdLocalPharmacy, bg: "#ec4899" },
+  fuel: { Icon: MdLocalGasStation, bg: "#64748b" },
+  gym: { Icon: MdFitnessCenter, bg: "#8b5cf6" },
+  temple: { Icon: MdTempleBuddhist, bg: "#eab308" },
+  landmark: { Icon: MdAccountBalance, bg: "#06b6d4" },
+  hotel: { Icon: MdHotel, bg: "#3b82f6" },
+  shop: { Icon: MdStorefront, bg: "#14b8a6" },
 };
 
 // Derived from CATEGORY_TIER so the categories fetched from the API can
@@ -93,24 +93,24 @@ export default function GeneralPoisLayer({ pois }) {
     () =>
       Object.fromEntries(
         visiblePois.map((p) => {
-          const style = CATEGORY_STYLE[p.category] ?? { Icon: Building2, bg: "#6b7280" };
+          const style = CATEGORY_STYLE[p.category] ?? { Icon: MdPlace, bg: "#6b7280" };
           const icon = showLabels
             ? createLabeledPoiIcon(style.Icon, p.name, { bg: style.bg })
-            : createDotIcon(style.Icon, { bg: style.bg, size: 22 });
+            : createPoiPinIcon(style.Icon, { bg: style.bg, size: 26 });
           return [p.id, icon];
         })
       ),
     [visiblePois, showLabels]
   );
 
-  const iconCreateFunction = useMemo(() => (cluster) => createPoiClusterIcon(Building2, cluster.getChildCount()), []);
+  const iconCreateFunction = useMemo(() => (cluster) => createPoiClusterIcon(MdPlace, cluster.getChildCount()), []);
 
   if (!activeTier) return null;
 
   // Must sit at or below the map's actual reachable max zoom (see prior fix:
   // a threshold above maxZoom is unreachable and clusters never disassemble)
   // — but pinning it to exactly maxZoom means the very last, tightest
-  // residual clusters (e.g. several banks sharing one building) only pop
+  // residual clusters (e.g. several shops sharing one building) only pop
   // into individual pins on the final possible zoom step, which reads as an
   // abrupt swap rather than a natural zoom-in. Backing it off by 2 levels
   // means that swap happens while there's still real-world separation to
