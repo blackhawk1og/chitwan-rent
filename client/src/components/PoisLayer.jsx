@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { Marker } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
-import { GraduationCap } from "lucide-react";
-import { createLabeledPoiIcon, createClusterBadgeIcon } from "../lib/mapIcons.jsx";
+import { GraduationCap, BookOpen } from "lucide-react";
+import { createLabeledPoiIcon, createPoiClusterIcon } from "../lib/mapIcons.jsx";
 
 export default function PoisLayer({ pois }) {
   const icons = useMemo(
@@ -11,14 +11,7 @@ export default function PoisLayer({ pois }) {
   );
 
   const iconCreateFunction = useMemo(
-    () => (cluster) => {
-      const count = cluster.getChildCount();
-      return createClusterBadgeIcon({
-        line1: `${count}`,
-        line2: `school${count === 1 ? "" : "s"}`,
-        tone: "light",
-      });
-    },
+    () => (cluster) => createPoiClusterIcon(GraduationCap, cluster.getChildCount(), { secondaryIcon: BookOpen }),
     []
   );
 

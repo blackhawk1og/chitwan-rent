@@ -70,6 +70,88 @@ export function createClusterBadgeIcon({ line1, line2, tone = "light" }) {
   });
 }
 
+// Circular icon-button cluster badge — matches the on-map toggle-icon visual
+// language (see IconStack's StackButton "active" state) rather than the
+// flat/seeker text-pill cluster style, since POI markers are icon-based
+// rather than text chips. An optional small secondaryIcon renders as a
+// combined badge on the circle itself (e.g. an open-book icon layered onto
+// the graduation cap for schools, so the cluster reads as "multiple" rather
+// than looking identical to a single POI marker); the count always renders
+// as a small notification-style chip in the top-right corner.
+export function createPoiClusterIcon(IconComponent, count, { secondaryIcon: SecondaryIcon } = {}) {
+  const size = 35;
+  const html = renderToStaticMarkup(
+    <div style={{ position: "relative", width: size, height: size }}>
+      <div
+        style={{
+          width: size,
+          height: size,
+          borderRadius: "9999px",
+          background: "#7c3aed",
+          border: "2px solid rgba(255,255,255,0.9)",
+          boxShadow: "0 3px 10px rgba(0,0,0,0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <IconComponent size={19} color="#ffffff" strokeWidth={2.2} />
+      </div>
+
+      {SecondaryIcon && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: -1,
+            right: -1,
+            width: 16,
+            height: 16,
+            borderRadius: "9999px",
+            background: "#7c3aed",
+            border: "2px solid #0b0c17",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <SecondaryIcon size={9} color="#ffffff" strokeWidth={2.5} />
+        </div>
+      )}
+
+      <span
+        style={{
+          position: "absolute",
+          top: -6,
+          right: -6,
+          minWidth: 20,
+          height: 20,
+          padding: "0 5px",
+          borderRadius: "9999px",
+          background: "#ffffff",
+          color: "#7c3aed",
+          fontSize: 11,
+          fontWeight: 800,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          border: "2px solid #0b0c17",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.4)",
+          fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+        }}
+      >
+        {count}
+      </span>
+    </div>
+  );
+
+  return L.divIcon({
+    html,
+    className: "chitwan-cluster-icon",
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
 // Small icon + text label, baked into one marker — used for POIs (schools/colleges).
 export function createLabeledPoiIcon(IconComponent, label, { bg = "#38bdf8" } = {}) {
   const html = renderToStaticMarkup(
