@@ -107,13 +107,29 @@ export default function GeneralPoisLayer({ pois }) {
 
   if (!activeTier) return null;
 
+  // Must sit at or below the map's actual reachable max zoom (see prior fix:
+  // a threshold above maxZoom is unreachable and clusters never disassemble)
+  // — but pinning it to exactly maxZoom means the very last, tightest
+  // residual clusters (e.g. several banks sharing one building) only pop
+  // into individual pins on the final possible zoom step, which reads as an
+  // abrupt swap rather than a natural zoom-in. Backing it off by 2 levels
+  // means that swap happens while there's still real-world separation to
+  // read: at this dataset's latitude, maxClusterRadius (45px) covers ~95m
+  // at maxZoom-2 vs. ~24m at maxZoom itself, so most clustered points have
+  // already spread out visually by the time clustering turns off — the only
+  // pairs that still overlap post-disassembly are ones sitting a few meters
+  // apart in reality (e.g. two counters in the same building), which no
+  // reachable zoom can separate anyway and which every pin-map (Google Maps
+  // included) just renders as slightly overlapping markers.
+  const disableClusteringAtZoom = Math.max(map.getMinZoom(), map.getMaxZoom() - 2);
+
   return (
     <MarkerClusterGroup
       iconCreateFunction={iconCreateFunction}
       maxClusterRadius={45}
       spiderfyOnMaxZoom
       showCoverageOnHover={false}
-      disableClusteringAtZoom={19}
+      disableClusteringAtZoom={disableClusteringAtZoom}
     >
       {visiblePois.map((poi) => (
         <Marker key={poi.id} position={[poi.lat, poi.lng]} icon={icons[poi.id]} />
