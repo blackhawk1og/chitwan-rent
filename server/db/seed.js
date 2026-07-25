@@ -1,6 +1,6 @@
 import { pool } from "../src/db.js";
 import { BUS_ROUTES, fetchRoadSnappedGeometry } from "./busRoutesData.js";
-import { fetchSchoolsAndColleges } from "./poisData.js";
+import { fetchSchoolsAndColleges, fetchGeneralPois } from "./poisData.js";
 
 // --- Chitwan areas with rough centers + density weight (higher = more listings) ---
 // Coordinates are approximate (dummy demo data), clustered around real Chitwan wards/municipalities.
@@ -283,23 +283,16 @@ async function seedBusRoutes() {
 }
 
 async function seedPois() {
-  // Schools/colleges are real OSM data (fetched below) — only the categories
-  // OSM doesn't cover for this project (hospital/temple/landmark) stay as
-  // dummy demo entries jittered around the seeded area centers.
+  // Schools/colleges and general POIs (restaurants, cafes, hospitals, shops,
+  // etc.) are real OSM data (fetched below) — only "landmark", a category
+  // OSM doesn't map cleanly for this project, stays as dummy demo entries
+  // jittered around the seeded area centers.
   const dummyPois = [
-    { name: "Bharatpur Hospital", category: "hospital" },
-    { name: "Bharatpur Cancer Hospital", category: "hospital" },
     { name: "Narayangarh Bus Park", category: "landmark" },
     { name: "Bharatpur Buddha Chowk", category: "landmark" },
-    { name: "Devghat Temple", category: "temple" },
-    { name: "National Trauma Center Chitwan", category: "hospital" },
-    { name: "Gauri Shankar Temple", category: "temple" },
     { name: "Sauraha Chitwan National Park Gate", category: "landmark" },
     { name: "Ratnanagar Municipality Office", category: "landmark" },
-    { name: "Khairahani Hospital", category: "hospital" },
-    { name: "Bhagwati Temple, Bharatpur", category: "temple" },
     { name: "Narayani Riverside Park", category: "landmark" },
-    { name: "Kalika Health Post", category: "hospital" },
   ];
   for (const p of dummyPois) {
     const area = pickArea();
@@ -327,7 +320,25 @@ async function seedPois() {
     console.warn(`Overpass fetch failed (${err.message}) — run "npm run seed:pois" later to backfill schools/colleges.`);
   }
 
-  return dummyPois.length + schoolCount;
+  let generalCount = 0;
+  try {
+    const general = await fetchGeneralPois();
+    for (const p of general) {
+      await pool.query(`INSERT INTO pois (name, category, lat, lng) VALUES ($1,$2,$3,$4)`, [
+        p.name,
+        p.category,
+        p.lat,
+        p.lng,
+      ]);
+    }
+    generalCount = general.length;
+  } catch (err) {
+    console.warn(
+      `Overpass fetch failed (${err.message}) — run "npm run seed:general-pois" later to backfill restaurants/cafes/shops/etc.`
+    );
+  }
+
+  return dummyPois.length + schoolCount + generalCount;
 }
 
 async function main() {

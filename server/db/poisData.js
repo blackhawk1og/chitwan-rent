@@ -208,3 +208,61 @@ export async function fetchSchoolsAndColleges() {
 
   return pois.map(({ isWay, ...rest }) => rest);
 }
+
+// amenity values pulled as-is for the category column; place_of_worship is
+// relabeled to the friendlier "temple" (matches the category name the
+// pre-existing dummy temple entries already use).
+const GENERAL_POI_AMENITIES = [
+  "restaurant", "cafe", "hospital", "clinic", "pharmacy", "bank", "atm", "fuel", "gym", "place_of_worship",
+];
+
+function categorizeElement(tags) {
+  if (tags.amenity === "place_of_worship") return "temple";
+  if (tags.amenity) return tags.amenity;
+  if (tags.shop) return "shop";
+  if (tags.tourism === "hotel" || tags.tourism === "guest_house") return "hotel";
+  return null;
+}
+
+// Pulls general-purpose POIs (restaurants, cafes, hospitals, pharmacies,
+// banks/ATMs, fuel stations, gyms, places of worship, any shop=*, and
+// hotels/guest houses) OSM has tagged inside the Chitwan bbox — everything
+// the dedicated school/college layer doesn't cover. Same shape and dedup
+// pass as fetchSchoolsAndColleges() above.
+export async function fetchGeneralPois() {
+  const { south, west, north, east } = CHITWAN_BBOX;
+  const bbox = `${south},${west},${north},${east}`;
+  const amenityAlt = GENERAL_POI_AMENITIES.join("|");
+  const query = `
+    [out:json][timeout:120];
+    (
+      node["amenity"~"^(${amenityAlt})$"](${bbox});
+      way["amenity"~"^(${amenityAlt})$"](${bbox});
+      node["shop"](${bbox});
+      way["shop"](${bbox});
+      node["tourism"~"^(hotel|guest_house)$"](${bbox});
+      way["tourism"~"^(hotel|guest_house)$"](${bbox});
+    );
+    out center;
+  `;
+
+  const data = await queryOverpass(query);
+
+  const rawPois = data.elements
+    .map((el) => {
+      const lat = el.type === "node" ? el.lat : el.center?.lat;
+      const lng = el.type === "node" ? el.lon : el.center?.lon;
+      if (lat == null || lng == null) return null;
+      const name = el.tags?.name;
+      if (!name) return null;
+      const category = categorizeElement(el.tags ?? {});
+      if (!category) return null;
+      return { name, category, lat, lng, isWay: el.type === "way" };
+    })
+    .filter(Boolean);
+
+  const { pois, removedCount } = dedupePois(rawPois);
+  console.log(`Removed ${removedCount} duplicate general POIs out of ${rawPois.length} fetched.`);
+
+  return pois.map(({ isWay, ...rest }) => rest);
+}

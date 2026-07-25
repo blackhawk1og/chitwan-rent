@@ -10,7 +10,8 @@
     "db:schema": "node db/run-schema.js",
     "db:seed": "node db/seed.js",
     "seed:bus-routes": "node db/seed-bus-routes.js",
-    "seed:pois": "node db/seed-pois.js"
+    "seed:pois": "node db/seed-pois.js",
+    "seed:general-pois": "node db/seed-general-pois.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

@@ -36,6 +36,7 @@ import SeekersLayer from "./SeekersLayer.jsx";
 import ToletSpotsLayer from "./ToletSpotsLayer.jsx";
 import BusRoutesLayer from "./BusRoutesLayer.jsx";
 import PoisLayer from "./PoisLayer.jsx";
+import GeneralPoisLayer, { GENERAL_POI_CATEGORIES } from "./GeneralPoisLayer.jsx";
 import ListingChip from "./ListingChip.jsx";
 import FlatDetailPanel from "./FlatDetailPanel.jsx";
 import SeekerDetailCard from "./SeekerDetailCard.jsx";
@@ -129,6 +130,11 @@ export default function MapShell() {
   const { data: toletSpots = [] } = useToletSpots(filters.showToletBoards);
   const { data: busRoutes = [] } = useBusRoutes(busRoutesOn);
   const { data: schoolPois = [] } = usePois("school,college", schoolsOn);
+  // No manual toggle — a persistent, zoom-gated layer (matches Google Maps'
+  // default POI behavior, the reference this app is styled after), so it's
+  // always fetched once and reveals itself progressively as the user zooms
+  // in (see GeneralPoisLayer's tier thresholds).
+  const { data: generalPois = [] } = usePois(GENERAL_POI_CATEGORIES);
 
   const [selectedItem, setSelectedItem] = useState(null); // { type: 'flat'|'seeker', data } | null
   const [expandedItem, setExpandedItem] = useState(null); // same shape, drives the full detail card
@@ -587,6 +593,7 @@ export default function MapShell() {
             )}
             <ToletSpotsLayer spots={displayedToletSpots} />
             {schoolsOn && <PoisLayer pois={schoolPois} />}
+            <GeneralPoisLayer pois={generalPois} />
           </>
         )}
         {busRoutesOn && <BusRoutesLayer routes={busRoutes} />}
