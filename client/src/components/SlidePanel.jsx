@@ -24,7 +24,7 @@ export default function SlidePanel({ onClose, children }) {
       />
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`absolute inset-x-0 bottom-0 z-10 flex max-h-[92vh] flex-col overflow-y-auto rounded-t-3xl border-t border-white/10 bg-surface shadow-2xl transition-transform duration-300 ease-out sm:relative sm:h-auto sm:max-h-[85vh] sm:w-full sm:max-w-[600px] sm:rounded-3xl sm:border sm:transform-none sm:transition-none ${
+        className={`absolute inset-x-0 bottom-0 z-10 flex max-h-[92vh] flex-col overflow-y-auto rounded-t-3xl border-t border-white/10 bg-surface shadow-2xl transition-transform duration-300 ease-out sm:relative sm:h-auto sm:max-h-[85vh] sm:w-full sm:max-w-[450px] sm:rounded-3xl sm:border sm:transform-none sm:transition-none ${
           entered ? "translate-y-0" : "translate-y-full"
         }`}
       >

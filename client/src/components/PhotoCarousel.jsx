@@ -1,18 +1,11 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function PhotoCarousel({ photos = [] }) {
   const [index, setIndex] = useState(0);
 
   if (!photos.length) {
-    return (
-      <div className="flex h-48 w-full items-center justify-center rounded-2xl border border-white/10 bg-surface-alt">
-        <div className="flex flex-col items-center gap-2 text-text-muted">
-          <ImageOff size={28} />
-          <span className="text-xs font-medium">No photos yet</span>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   const prev = () => setIndex((i) => (i - 1 + photos.length) % photos.length);
