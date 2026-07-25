@@ -1,4 +1,5 @@
 import { pool } from "../src/db.js";
+import { BUS_ROUTES, fetchRoadSnappedGeometry } from "./busRoutesData.js";
 
 // --- Chitwan areas with rough centers + density weight (higher = more listings) ---
 // Coordinates are approximate (dummy demo data), clustered around real Chitwan wards/municipalities.
@@ -257,60 +258,11 @@ async function seedToletSpots(users) {
 }
 
 async function seedBusRoutes() {
-  // Approximate local road corridors, not exact GPS-surveyed routes.
-  const routes = [
-    {
-      name: "Route 1: Bus Park - Pulchowk",
-      color: "#22c55e",
-      coords: [[84.4327, 27.6633], [84.42, 27.655], [84.4055, 27.6469]],
-    },
-    {
-      name: "Route 2: Hospital Chowk - Jugedi",
-      color: "#ec4899",
-      coords: [[84.4172, 27.6395], [84.43, 27.633], [84.445, 27.628]],
-    },
-    {
-      name: "Route 3: Narayangarh - Ratnanagar",
-      color: "#8b5cf6",
-      coords: [[84.4327, 27.6633], [84.46, 27.62], [84.485, 27.582]],
-    },
-    {
-      name: "Route 4: Bharatpur-5 - Khairahani",
-      color: "#f59e0b",
-      coords: [[84.4055, 27.6469], [84.37, 27.62], [84.34, 27.61]],
-    },
-    {
-      name: "Route 5: Bus Park - Gitanagar",
-      color: "#14b8a6",
-      coords: [[84.4327, 27.6633], [84.4, 27.68], [84.38, 27.69]],
-    },
-    {
-      name: "Route 6: Bagauda - Jutpani",
-      color: "#3b82f6",
-      coords: [[84.45, 27.695], [84.453, 27.68], [84.455, 27.67]],
-    },
-    {
-      name: "Route 7: Pulchowk - Rapti Bridge",
-      color: "#22c55e",
-      coords: [[84.4055, 27.6469], [84.35, 27.635], [84.28, 27.63]],
-    },
-    {
-      name: "Route 8: Hospital Chowk - Kalika",
-      color: "#ec4899",
-      coords: [[84.4172, 27.6395], [84.3, 27.58], [84.25, 27.56]],
-    },
-    {
-      name: "Route 9: Bus Park - Shaktikhor",
-      color: "#8b5cf6",
-      coords: [[84.4327, 27.6633], [84.32, 27.68], [84.2, 27.72]],
-    },
-    {
-      name: "Route 10: Bharatpur-14 - Ichchhakamana",
-      color: "#f59e0b",
-      coords: [[84.445, 27.628], [84.3, 27.64], [84.15, 27.65]],
-    },
-  ];
-  for (const r of routes) {
+  // Waypoints are snapped to real road geometry via OSRM (see
+  // busRoutesData.js) rather than connected as straight lines, so routes
+  // trace actual streets instead of cutting across terrain/water.
+  for (const r of BUS_ROUTES) {
+    const geometry = await fetchRoadSnappedGeometry(r.waypoints);
     await pool.query(
       `INSERT INTO bus_routes (name, color, geojson) VALUES ($1,$2,$3)`,
       [
@@ -319,12 +271,14 @@ async function seedBusRoutes() {
         JSON.stringify({
           type: "Feature",
           properties: { name: r.name, color: r.color },
-          geometry: { type: "LineString", coordinates: r.coords },
+          geometry,
         }),
       ]
     );
+    // Be polite to the shared public OSRM demo server.
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  return routes.length;
+  return BUS_ROUTES.length;
 }
 
 async function seedPois() {
