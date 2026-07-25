@@ -27,9 +27,14 @@ export default {
           "0%, 100%": { boxShadow: "0 0 0 0 rgba(124,58,237,0.65)", transform: "scale(1)" },
           "50%": { boxShadow: "0 0 0 8px rgba(124,58,237,0)", transform: "scale(1.08)" },
         },
+        "locate-pulse": {
+          "0%": { transform: "scale(0.6)", opacity: "0.7" },
+          "100%": { transform: "scale(2.2)", opacity: "0" },
+        },
       },
       animation: {
         "attention-pulse": "attention-pulse 0.6s ease-in-out 3",
+        "locate-pulse": "locate-pulse 1.8s ease-out infinite",
       },
     },
   },

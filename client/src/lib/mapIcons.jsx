@@ -176,6 +176,53 @@ export function createFlatInfoChipIcon({ bhk, rent, rating, gated, sizeTier = "b
   });
 }
 
+// "You are here" marker for Locate Me: a solid blue dot with a white ring
+// and a soft pulsing accuracy halo — the conventional browser-geolocation
+// look, kept deliberately distinct from every other marker type on the map.
+export function createUserLocationIcon() {
+  const html = renderToStaticMarkup(
+    <div
+      style={{
+        position: "relative",
+        width: 26,
+        height: 26,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <span
+        className="animate-locate-pulse"
+        style={{
+          position: "absolute",
+          width: 26,
+          height: 26,
+          borderRadius: "9999px",
+          background: "rgba(59,130,246,0.5)",
+        }}
+      />
+      <span
+        style={{
+          position: "relative",
+          width: 14,
+          height: 14,
+          borderRadius: "9999px",
+          background: "#3b82f6",
+          border: "2.5px solid #ffffff",
+          boxShadow: "0 0 0 1px rgba(0,0,0,0.25), 0 2px 6px rgba(0,0,0,0.5)",
+        }}
+      />
+    </div>
+  );
+
+  return L.divIcon({
+    html,
+    className: "chitwan-pin-icon",
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  });
+}
+
 // White circular drag handle for the Area Stats rectangle's corners.
 export function createHandleIcon() {
   const html = renderToStaticMarkup(

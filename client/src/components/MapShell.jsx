@@ -24,7 +24,7 @@ import { useCreateRentReport } from "../hooks/useCreateRentReport.js";
 import { usePinDropFlow } from "../hooks/usePinDropFlow.js";
 import { formatRs } from "../lib/format.js";
 import { DEFAULT_FILTERS, countActiveFilters } from "../lib/filters.js";
-import { createDotIcon, createHandleIcon } from "../lib/mapIcons.jsx";
+import { createDotIcon, createHandleIcon, createUserLocationIcon } from "../lib/mapIcons.jsx";
 import TopNavPill from "./TopNavPill.jsx";
 import SearchBar from "./SearchBar.jsx";
 import IconStack from "./IconStack.jsx";
@@ -95,6 +95,7 @@ const MAX_PIN_DISTANCE_METERS = 100_000;
 const draftFlatIcon = createDotIcon(KeyRound, { bg: "#7c3aed", size: 32 });
 const draftSeekerIcon = createDotIcon(Search, { bg: "#14b8a6", size: 32 });
 const areaCornerIcon = createHandleIcon();
+const userLocationIcon = createUserLocationIcon();
 
 export default function MapShell() {
   const location = useLocation();
@@ -189,6 +190,13 @@ export default function MapShell() {
   const [toletPicking, setToletPicking] = useState(false);
 
   const [pinsHidden, setPinsHidden] = useState(false);
+
+  // "You are here" marker dropped by Locate Me — a single snapshot position,
+  // persists on the map (moving to the new spot each time Locate Me is used
+  // again) rather than continuously live-tracking.
+  const [userLocation, setUserLocation] = useState(null);
+  const [locateError, setLocateError] = useState(null);
+  const locateErrorTimeoutRef = useRef(null);
 
   // Area Stats: 'onboarding' -> 'drawing' (2 taps) -> 'adjusting' (drag corners) -> 'results'
   const [areaStatsStep, setAreaStatsStep] = useState(null);
@@ -463,12 +471,28 @@ export default function MapShell() {
     }
   };
 
+  const showLocateError = (message) => {
+    if (locateErrorTimeoutRef.current) clearTimeout(locateErrorTimeoutRef.current);
+    setLocateError(message);
+    locateErrorTimeoutRef.current = setTimeout(() => setLocateError(null), 4000);
+  };
+
   const handleLocateMe = () => {
     closeQuickModal();
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition((pos) => {
-      mapRef.current?.flyTo([pos.coords.latitude, pos.coords.longitude], 15, { duration: 1.2 });
-    });
+    if (!navigator.geolocation) {
+      showLocateError("Location isn't supported in this browser.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setUserLocation({ lat: latitude, lng: longitude });
+        mapRef.current?.flyTo([latitude, longitude], 15, { duration: 1.2 });
+      },
+      () => {
+        showLocateError("Couldn't get your location — check your browser's location permission.");
+      }
+    );
   };
 
   const handleToggleHidePins = () => {
@@ -600,6 +624,8 @@ export default function MapShell() {
             eventHandlers={{ dragend: (e) => findFlatFlow.dragPin(e.target.getLatLng()) }}
           />
         )}
+
+        {userLocation && <Marker position={[userLocation.lat, userLocation.lng]} icon={userLocationIcon} />}
 
         {!mapClickCaptured && !quickAction && <EmptyTapCatcher onEmptyTap={handleEmptyMapTap} />}
       </MapContainer>
@@ -895,6 +921,12 @@ export default function MapShell() {
       {!flatsLoading && displayedFlats.length === 0 && (
         <div className="pointer-events-none absolute bottom-8 left-1/2 z-[900] -translate-x-1/2 rounded-full border border-white/10 bg-surface/90 px-4 py-2 text-xs font-semibold text-text-muted shadow-lg backdrop-blur-md">
           No flats match your filters
+        </div>
+      )}
+
+      {locateError && (
+        <div className="pointer-events-none absolute bottom-24 left-1/2 z-[1600] -translate-x-1/2 rounded-full border border-white/10 bg-surface/90 px-4 py-2 text-xs font-semibold text-text-primary shadow-lg backdrop-blur-md">
+          ⚠️ {locateError}
         </div>
       )}
     </div>
