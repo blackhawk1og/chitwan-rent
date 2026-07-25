@@ -1,5 +1,6 @@
 import { pool } from "../src/db.js";
 import { BUS_ROUTES, fetchRoadSnappedGeometry } from "./busRoutesData.js";
+import { fetchSchoolsAndColleges } from "./poisData.js";
 
 // --- Chitwan areas with rough centers + density weight (higher = more listings) ---
 // Coordinates are approximate (dummy demo data), clustered around real Chitwan wards/municipalities.
@@ -282,41 +283,51 @@ async function seedBusRoutes() {
 }
 
 async function seedPois() {
-  const pois = [
+  // Schools/colleges are real OSM data (fetched below) — only the categories
+  // OSM doesn't cover for this project (hospital/temple/landmark) stay as
+  // dummy demo entries jittered around the seeded area centers.
+  const dummyPois = [
     { name: "Bharatpur Hospital", category: "hospital" },
-    { name: "College of Medical Sciences (CMC)", category: "college" },
-    { name: "Narayani Secondary School", category: "school" },
-    { name: "Amrit Science Campus, Chitwan", category: "college" },
-    { name: "Bal Kumari Higher Secondary School", category: "school" },
     { name: "Bharatpur Cancer Hospital", category: "hospital" },
-    { name: "Chitwan Medical College", category: "college" },
-    { name: "Bishwa Adarsha Higher Secondary School", category: "school" },
     { name: "Narayangarh Bus Park", category: "landmark" },
     { name: "Bharatpur Buddha Chowk", category: "landmark" },
     { name: "Devghat Temple", category: "temple" },
-    { name: "Bal Mandir School", category: "school" },
-    { name: "Rapti Model Higher Secondary School", category: "school" },
     { name: "National Trauma Center Chitwan", category: "hospital" },
     { name: "Gauri Shankar Temple", category: "temple" },
-    { name: "Birendranagar Higher Secondary School", category: "school" },
     { name: "Sauraha Chitwan National Park Gate", category: "landmark" },
     { name: "Ratnanagar Municipality Office", category: "landmark" },
     { name: "Khairahani Hospital", category: "hospital" },
-    { name: "Manakamana Boarding School", category: "school" },
-    { name: "Xavier International College", category: "college" },
     { name: "Bhagwati Temple, Bharatpur", category: "temple" },
-    { name: "Green Valley College", category: "college" },
     { name: "Narayani Riverside Park", category: "landmark" },
     { name: "Kalika Health Post", category: "hospital" },
   ];
-  for (const p of pois) {
+  for (const p of dummyPois) {
     const area = pickArea();
-    await pool.query(
-      `INSERT INTO pois (name, category, lat, lng) VALUES ($1,$2,$3,$4)`,
-      [p.name, p.category, jitter(area.lat, 0.015), jitter(area.lng, 0.015)]
-    );
+    await pool.query(`INSERT INTO pois (name, category, lat, lng) VALUES ($1,$2,$3,$4)`, [
+      p.name,
+      p.category,
+      jitter(area.lat, 0.015),
+      jitter(area.lng, 0.015),
+    ]);
   }
-  return pois.length;
+
+  let schoolCount = 0;
+  try {
+    const schools = await fetchSchoolsAndColleges();
+    for (const p of schools) {
+      await pool.query(`INSERT INTO pois (name, category, lat, lng, tier) VALUES ($1,$2,$3,$4,'important')`, [
+        p.name,
+        p.category,
+        p.lat,
+        p.lng,
+      ]);
+    }
+    schoolCount = schools.length;
+  } catch (err) {
+    console.warn(`Overpass fetch failed (${err.message}) — run "npm run seed:pois" later to backfill schools/colleges.`);
+  }
+
+  return dummyPois.length + schoolCount;
 }
 
 async function main() {

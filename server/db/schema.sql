@@ -130,7 +130,8 @@ CREATE TABLE pois (
   name TEXT,
   category TEXT, -- 'school'|'college'|'temple'|'hospital'|'landmark'
   lat DOUBLE PRECISION,
-  lng DOUBLE PRECISION
+  lng DOUBLE PRECISION,
+  tier TEXT -- 'important' for school/college (real OSM data); NULL for dummy categories
 );
 
 -- Anonymous rent data points from the empty-map "Add something here" quick

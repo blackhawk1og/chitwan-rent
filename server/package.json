@@ -9,7 +9,8 @@
     "start": "node src/index.js",
     "db:schema": "node db/run-schema.js",
     "db:seed": "node db/seed.js",
-    "seed:bus-routes": "node db/seed-bus-routes.js"
+    "seed:bus-routes": "node db/seed-bus-routes.js",
+    "seed:pois": "node db/seed-pois.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

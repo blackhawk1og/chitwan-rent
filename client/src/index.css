@@ -43,6 +43,14 @@ body {
   cursor: pointer;
 }
 
+/* CARTO's dark-matter label tiles render road/place names at fairly low
+   contrast by default. Boosting brightness/contrast on just this overlay
+   (road/water/fill colors live on a separate base tile layer underneath)
+   makes text legible without washing out the rest of the dark aesthetic. */
+.chitwan-label-tile {
+  filter: brightness(1.6) contrast(1.15);
+}
+
 .leaflet-popup-content-wrapper {
   background: #151626;
   color: #f5f5f7;

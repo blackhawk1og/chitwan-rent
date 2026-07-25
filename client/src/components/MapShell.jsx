@@ -6,6 +6,7 @@ import {
   CHITWAN_CENTER,
   DEFAULT_ZOOM,
   DARK_TILE_URL,
+  DARK_LABEL_TILE_URL,
   DARK_TILE_ATTRIBUTION,
   SATELLITE_TILE_URL,
   SATELLITE_ATTRIBUTION,
@@ -569,7 +570,10 @@ export default function MapShell() {
         {satelliteOn ? (
           <TileLayer key="satellite" url={SATELLITE_TILE_URL} attribution={SATELLITE_ATTRIBUTION} />
         ) : (
-          <TileLayer key="dark" url={DARK_TILE_URL} attribution={DARK_TILE_ATTRIBUTION} />
+          <>
+            <TileLayer key="dark-base" url={DARK_TILE_URL} attribution={DARK_TILE_ATTRIBUTION} />
+            <TileLayer key="dark-labels" url={DARK_LABEL_TILE_URL} className="chitwan-label-tile" />
+          </>
         )}
 
         {!pinsHidden && (

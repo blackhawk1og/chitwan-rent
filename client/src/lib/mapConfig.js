@@ -1,7 +1,12 @@
 export const CHITWAN_CENTER = [27.629, 84.353];
 export const DEFAULT_ZOOM = 12;
 
-export const DARK_TILE_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+// Split into a labels-free base layer plus a separate labels-only overlay
+// (both official CARTO Dark Matter variants) so label contrast can be
+// boosted independently of the road/water/fill colors underneath — see
+// DARK_LABEL_TILE_CLASS usage in MapShell for the contrast boost itself.
+export const DARK_TILE_URL = "https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png";
+export const DARK_LABEL_TILE_URL = "https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png";
 export const DARK_TILE_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
