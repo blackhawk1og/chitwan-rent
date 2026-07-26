@@ -212,23 +212,61 @@ export async function fetchSchoolsAndColleges() {
 // amenity values pulled as-is for the category column; place_of_worship is
 // relabeled to the friendlier "temple" (matches the category name the
 // pre-existing dummy temple entries already use). Deliberately excludes
-// bank/atm — dropped from the POI set entirely.
-const GENERAL_POI_AMENITIES = [
-  "restaurant", "cafe", "hospital", "clinic", "pharmacy", "fuel", "gym", "place_of_worship",
-];
+// bank/atm and fuel/gym — dropped from the POI set entirely (along with
+// shop=* below, these were the app's "general POI blue" categories).
+const GENERAL_POI_AMENITIES = ["restaurant", "cafe", "hospital", "clinic", "pharmacy", "place_of_worship"];
 
 function categorizeElement(tags) {
   if (tags.amenity === "place_of_worship") return "temple";
   if (tags.amenity) return tags.amenity;
-  if (tags.shop) return "shop";
-  if (tags.tourism === "hotel" || tags.tourism === "guest_house") return "hotel";
   return null;
 }
 
+// OSM's `shop=*` tag covers every kind of small business indiscriminately,
+// which floods the map with noisy, low-relevance pins a rental-listing app
+// has no use for (decor shops, photo studios, mobile-phone stores, vehicle
+// showrooms/workshops, furniture stores, generic "plaza" listings...).
+// Filtered by name substring since OSM doesn't tag "relevance" — matched
+// case-insensitively against the whole name.
+export const EXCLUDED_POI_NAME_KEYWORDS = [
+  "plaza",
+  "decor", // catches "decor" and "decore"
+  "studio",
+  "mobile", // mobile phone shops/"mobile house"/"mobile pasal"
+  "wash cent", // "wash center"/"wash centre"
+  "showroom",
+  "workshop",
+  "furnitur", // "furniture"
+  "furnish", // "furnishing"
+  "recondition",
+  "repair",
+  "service cent", // "service center"/"service centre"
+  // Car/bike brand names used as bare dealership/showroom listings.
+  "toyota",
+  "honda",
+  "hyundai",
+  "suzuki",
+  "mitsubishi",
+  "nissan",
+  "kia motors",
+  "bajaj",
+  "yamaha",
+  "foton",
+  "royal enfield",
+  "ford",
+];
+
+export function isExcludedPoiName(name) {
+  const lower = name.toLowerCase();
+  return EXCLUDED_POI_NAME_KEYWORDS.some((keyword) => lower.includes(keyword));
+}
+
 // Pulls general-purpose POIs (restaurants, cafes, hospitals, pharmacies,
-// fuel stations, gyms, places of worship, any shop=*, and hotels/guest
-// houses) OSM has tagged inside the Chitwan bbox — everything the dedicated
-// school/college layer doesn't cover. Same shape and dedup pass as
+// places of worship) OSM has tagged inside the Chitwan bbox — everything the
+// dedicated school/college layer doesn't cover. Deliberately excludes
+// tourism=hotel/guest_house, shop=*, amenity=fuel, and amenity=gym — all
+// dropped from the POI set entirely (shop/fuel/gym were the app's "general
+// POI blue" categories). Same shape and dedup pass as
 // fetchSchoolsAndColleges() above.
 export async function fetchGeneralPois() {
   const { south, west, north, east } = CHITWAN_BBOX;
@@ -239,10 +277,6 @@ export async function fetchGeneralPois() {
     (
       node["amenity"~"^(${amenityAlt})$"](${bbox});
       way["amenity"~"^(${amenityAlt})$"](${bbox});
-      node["shop"](${bbox});
-      way["shop"](${bbox});
-      node["tourism"~"^(hotel|guest_house)$"](${bbox});
-      way["tourism"~"^(hotel|guest_house)$"](${bbox});
     );
     out center;
   `;
@@ -256,6 +290,7 @@ export async function fetchGeneralPois() {
       if (lat == null || lng == null) return null;
       const name = el.tags?.name;
       if (!name) return null;
+      if (isExcludedPoiName(name)) return null;
       const category = categorizeElement(el.tags ?? {});
       if (!category) return null;
       return { name, category, lat, lng, isWay: el.type === "way" };

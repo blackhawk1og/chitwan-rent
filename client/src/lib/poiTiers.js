@@ -10,31 +10,48 @@
 // layer) and a hospital (tier 2, general layer) reveal at the exact same
 // zoom, giving one cohesive combined progression instead of two
 // independently-tuned systems.
-export const POI_TIER_1_ZOOM = 11; // national park gates, major civic landmarks — almost nothing else
-export const POI_TIER_2_ZOOM = 13; // + hospitals, clinics, colleges, temples, hotels/resorts
-export const POI_TIER_3_ZOOM = 14; // + schools, restaurants, fuel stations
-export const POI_TIER_4_ZOOM = 16; // + shops, cafes, gyms
-export const POI_TIER_5_ZOOM = 17; // + pharmacies — everything now visible
+// DEFAULT_ZOOM (mapConfig.js) is 12 — the "whole district" overview. Tier 1
+// deliberately starts well past that (not at/before it) so the default view
+// and any modest zoom-in stay completely free of POI pins, matching Google
+// Maps' own behavior of showing ~zero POI icons until the user has zoomed in
+// meaningfully past a whole-city/region view.
+export const POI_TIER_1_ZOOM = 14; // national park gates, major civic landmarks — almost nothing else
+export const POI_TIER_2_ZOOM = 15; // + hospitals, clinics, colleges, temples
+export const POI_TIER_3_ZOOM = 16; // + schools, restaurants
+export const POI_TIER_4_ZOOM = 17; // + cafes
+export const POI_TIER_5_ZOOM = 18; // + pharmacies — everything now visible
 export const POI_LABEL_ZOOM = 18; // icon-only below this; icon+label at/above it
 
 // Category -> tier. Where OSM/our data doesn't distinguish "major" from
-// "minor" within one category (e.g. every temple is just category="temple",
-// every hotel just "hotel"), the whole category is assigned a single tier
-// judged by its typical real-world prominence, per the reference screenshots.
+// "minor" within one category (e.g. every temple is just category="temple"),
+// the whole category is assigned a single tier judged by its typical
+// real-world prominence, per the reference screenshots. Hotel, shop, fuel,
+// and gym are deliberately absent — dropped from the POI set entirely
+// (shop/fuel/gym were the app's "general POI blue" categories, removed
+// together with the request to clear every blue pin off the map).
 export const CATEGORY_TIER = {
   landmark: 1,
   hospital: 2,
   clinic: 2,
   college: 2,
   temple: 2,
-  hotel: 2,
   school: 3,
   restaurant: 3,
-  fuel: 3,
-  shop: 4,
   cafe: 4,
-  gym: 4,
   pharmacy: 5,
+};
+
+// Google Maps' own POI color convention, reused by both POI layers. No
+// category uses "blue" (Google's general-POI/shopping/services hue) anymore
+// — the categories that used to (shop, fuel, gym) were removed entirely.
+// Schools/colleges moved off blue too, onto purple, so the map has zero blue
+// pins left while still keeping education pins on the map.
+export const POI_COLOR = {
+  orange: "#FF9800", // food & drink
+  red: "#EA4335", // medical
+  purple: "#9C27B0", // education (schools/colleges) — previously "entertainment, arts, lodging" before hotel was removed
+  green: "#0F9D58", // parks, nature, outdoor recreation
+  gray: "#9E9E9E", // temples/religious sites — no dedicated Google hue for these, so a neutral tone is used consistently instead of reusing purple's color
 };
 
 export function poiTierForZoom(zoom) {

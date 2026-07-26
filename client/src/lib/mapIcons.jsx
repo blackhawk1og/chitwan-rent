@@ -73,23 +73,39 @@ export function createClusterBadgeIcon({ line1, line2, tone = "light" }) {
 // Classic teardrop map-pin silhouette (wide circular top, tapering to a
 // point) shared by both POI marker variants below — the point is what
 // anchors to the actual lat/lng, not the shape's visual center, so every
-// caller must set iconAnchor to the pin's tip, not its midpoint. Fill stays
-// a fixed dark surface color (matches the app's existing dark theme);
-// per-category color-coding now lives on the ring/stroke instead of the
-// fill, since the fill is no longer a solid category-colored circle.
+// caller must set iconAnchor to the pin's tip, not its midpoint. Matches
+// Google Maps' own POI pin convention: a plain WHITE outer pin with a
+// category-colored circular badge centered in its head, and the icon
+// glyph in white on top of that badge — not a fully category-colored pin.
 const POI_PIN_PATH =
   "M12 32C12 32 22 18.5 22 12C22 6.48 17.52 2 12 2C6.48 2 2 6.48 2 12C2 18.5 12 32 12 32Z";
-const POI_PIN_FILL = "#1a1b2e";
 // Fraction of the pin's own height/width occupied by the circular top
 // portion (the rest tapers into the point) — used to center the icon glyph
 // inside that circle rather than the whole (taller) pin shape.
 const POI_PIN_HEAD_TOP = 0.0625;
 const POI_PIN_HEAD_HEIGHT = 0.625;
+// Inner colored-badge circle, in the same 24x32 viewBox as POI_PIN_PATH —
+// centered in the pin's head, smaller than the head itself so a visible
+// white ring remains around it (matches the reference "H" hospital pin).
+const POI_BADGE_CENTER = { x: 12, y: 12 };
+const POI_BADGE_RADIUS = 7.5;
 
-function poiPinSvg(width, height, ringColor) {
+// glow=true swaps the pin's static drop-shadow for a 2-blink glow animation
+// (pin-glow-blink, see tailwind.config.js) — filter-based rather than
+// box-shadow so it hugs the teardrop silhouette instead of drawing a
+// rectangular glow around the icon's bounding box. Used to draw attention to
+// pins that just appeared (e.g. right when a POI layer is switched on).
+function poiPinSvg(width, height, badgeColor, glow = false) {
   return (
-    <svg width={width} height={height} viewBox="0 0 24 32" style={{ position: "absolute", top: 0, left: 0 }}>
-      <path d={POI_PIN_PATH} fill={POI_PIN_FILL} stroke={ringColor} strokeWidth="2" />
+    <svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 32"
+      className={glow ? "animate-pin-glow-blink" : undefined}
+      style={{ position: "absolute", top: 0, left: 0, filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.55))" }}
+    >
+      <path d={POI_PIN_PATH} fill="#ffffff" stroke="rgba(0,0,0,0.18)" strokeWidth="1" />
+      <circle cx={POI_BADGE_CENTER.x} cy={POI_BADGE_CENTER.y} r={POI_BADGE_RADIUS} fill={badgeColor} />
     </svg>
   );
 }
@@ -98,13 +114,13 @@ function poiPinSvg(width, height, ringColor) {
 // threshold. Not to be confused with createDotIcon: that one is shared by
 // non-POI markers (seeker pins, draft pins, to-let spots) and must keep its
 // plain circular shape, so POI markers get their own dedicated pin shape here.
-export function createPoiPinIcon(IconComponent, { bg = "#38bdf8", size = 28 } = {}) {
+export function createPoiPinIcon(IconComponent, { bg = "#38bdf8", size = 28, glow = false } = {}) {
   const width = size;
   const height = Math.round(size * (32 / 24));
 
   const html = renderToStaticMarkup(
     <div style={{ position: "relative", width, height }}>
-      {poiPinSvg(width, height, bg)}
+      {poiPinSvg(width, height, bg, glow)}
       <div
         style={{
           position: "absolute",
@@ -117,7 +133,7 @@ export function createPoiPinIcon(IconComponent, { bg = "#38bdf8", size = 28 } = 
           justifyContent: "center",
         }}
       >
-        <IconComponent size={size * 0.45} color="#ffffff" />
+        <IconComponent size={size * 0.38} color="#ffffff" />
       </div>
     </div>
   );
@@ -133,7 +149,7 @@ export function createPoiPinIcon(IconComponent, { bg = "#38bdf8", size = 28 } = 
 
 // Small teardrop pin + text label, baked into one marker — used for POIs
 // (schools/colleges, general POIs) once zoomed in far enough to show names.
-export function createLabeledPoiIcon(IconComponent, label, { bg = "#38bdf8" } = {}) {
+export function createLabeledPoiIcon(IconComponent, label, { bg = "#38bdf8", glow = false } = {}) {
   const pinWidth = 20;
   const pinHeight = Math.round(pinWidth * (32 / 24));
 
@@ -143,7 +159,7 @@ export function createLabeledPoiIcon(IconComponent, label, { bg = "#38bdf8" } = 
     // whole row's height, keeping the iconAnchor math below exact.
     <div style={{ display: "flex", alignItems: "flex-end", gap: 4 }}>
       <div style={{ position: "relative", width: pinWidth, height: pinHeight, flexShrink: 0 }}>
-        {poiPinSvg(pinWidth, pinHeight, bg)}
+        {poiPinSvg(pinWidth, pinHeight, bg, glow)}
         <div
           style={{
             position: "absolute",
@@ -156,7 +172,7 @@ export function createLabeledPoiIcon(IconComponent, label, { bg = "#38bdf8" } = 
             justifyContent: "center",
           }}
         >
-          <IconComponent size={pinWidth * 0.5} color="#ffffff" />
+          <IconComponent size={pinWidth * 0.4} color="#ffffff" />
         </div>
       </div>
       <span

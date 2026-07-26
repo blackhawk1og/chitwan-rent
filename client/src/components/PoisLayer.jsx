@@ -1,10 +1,17 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Marker, useMap, useMapEvents } from "react-leaflet";
 import { MdSchool } from "react-icons/md";
 import { createPoiPinIcon, createLabeledPoiIcon } from "../lib/mapIcons.jsx";
-import { CATEGORY_TIER, POI_LABEL_ZOOM, poiTierForZoom } from "../lib/poiTiers.js";
+import { CATEGORY_TIER, POI_LABEL_ZOOM, POI_COLOR, poiTierForZoom } from "../lib/poiTiers.js";
 
-const SCHOOL_ICON_BG = "#38bdf8";
+// Blue was retired map-wide (it was the "general POI/shopping/services" hue
+// — shop/fuel/gym, the categories that used it, were all removed), so
+// schools/colleges render in purple instead.
+const SCHOOL_ICON_BG = POI_COLOR.purple;
+
+// Must be >= the pin-glow-blink animation's own duration (0.5s * 1 = 0.5s) so
+// the glow class isn't removed mid-blink.
+const GLOW_DURATION_MS = 600;
 
 export default function PoisLayer({ pois }) {
   const map = useMap();
@@ -19,25 +26,62 @@ export default function PoisLayer({ pois }) {
   const activeTier = poiTierForZoom(zoom);
   const showLabels = zoom >= POI_LABEL_ZOOM;
 
-  // College (tier 2) and school (tier 3) reveal at different zooms, same as
-  // every other POI category — no clustering at any density, matching the
-  // general-POI layer this shares its tier system with.
+  // Schools are always visible regardless of zoom — deliberately exempt from
+  // the tier system every other POI category (including college) still
+  // follows, so they never disappear no matter how far the user zooms out.
+  // College still reveals at tier 2, same as every other POI category — no
+  // clustering at any density, matching the general-POI layer this shares
+  // its tier system with.
   const visiblePois = useMemo(
-    () => (activeTier === 0 ? [] : pois.filter((p) => (CATEGORY_TIER[p.category] ?? 3) <= activeTier)),
+    () =>
+      pois.filter((p) => p.category === "school" || (activeTier > 0 && (CATEGORY_TIER[p.category] ?? 3) <= activeTier)),
     [pois, activeTier]
   );
+
+  // This component only mounts while the Schools toggle is on (see MapShell:
+  // `{schoolsOn && <PoisLayer ... />}`), so this is exactly "the button was
+  // just turned on" — no prop plumbing needed from IconStack. The glow fires
+  // once the FIRST time a pin actually becomes visible (not from raw mount
+  // time), since the map may still be zoomed out below the school reveal
+  // tier right when the toggle is clicked — firing from mount alone would
+  // let the glow window silently expire before any pin ever appears.
+  //
+  // The "turn it back off" timer is deliberately NOT torn down by this
+  // effect's own cleanup — visiblePois can legitimately get a new array
+  // reference again later (e.g. as Leaflet's zoom settles through
+  // intermediate values while still within the same tier), which would
+  // re-run this effect. If its cleanup canceled the pending timeout on every
+  // such re-run, and the early-return guard then skipped scheduling a
+  // replacement, justTurnedOn would get stuck true forever. The timer is
+  // only ever cleared on true unmount (the second effect below).
+  const [justTurnedOn, setJustTurnedOn] = useState(false);
+  const hasGlowedRef = useRef(false);
+  const glowTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    if (hasGlowedRef.current || visiblePois.length === 0) return;
+    hasGlowedRef.current = true;
+    setJustTurnedOn(true);
+    glowTimeoutRef.current = setTimeout(() => setJustTurnedOn(false), GLOW_DURATION_MS);
+  }, [visiblePois]);
+
+  useEffect(() => {
+    return () => {
+      if (glowTimeoutRef.current) clearTimeout(glowTimeoutRef.current);
+    };
+  }, []);
 
   const icons = useMemo(
     () =>
       Object.fromEntries(
         visiblePois.map((p) => {
           const icon = showLabels
-            ? createLabeledPoiIcon(MdSchool, p.name, { bg: SCHOOL_ICON_BG })
-            : createPoiPinIcon(MdSchool, { bg: SCHOOL_ICON_BG, size: 26 });
+            ? createLabeledPoiIcon(MdSchool, p.name, { bg: SCHOOL_ICON_BG, glow: justTurnedOn })
+            : createPoiPinIcon(MdSchool, { bg: SCHOOL_ICON_BG, size: 26, glow: justTurnedOn });
           return [p.id, icon];
         })
       ),
-    [visiblePois, showLabels]
+    [visiblePois, showLabels, justTurnedOn]
   );
 
   return (

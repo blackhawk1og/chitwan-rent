@@ -31,10 +31,17 @@ export default {
           "0%": { transform: "scale(0.6)", opacity: "0.7" },
           "100%": { transform: "scale(2.2)", opacity: "0" },
         },
+        "pin-glow-blink": {
+          "0%, 100%": { filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.55))" },
+          "50%": {
+            filter: "drop-shadow(0 0 2px rgba(255,255,255,0.95)) drop-shadow(0 0 4px rgba(66,133,244,0.95))",
+          },
+        },
       },
       animation: {
         "attention-pulse": "attention-pulse 0.6s ease-in-out 3",
         "locate-pulse": "locate-pulse 1.8s ease-out infinite",
+        "pin-glow-blink": "pin-glow-blink 0.5s ease-in-out 1",
       },
     },
   },
