@@ -3,6 +3,16 @@ export function formatRs(amount) {
   return `Rs. ${Number(amount).toLocaleString("en-IN")}`;
 }
 
+// Compact "10K" style used where space is tight (e.g. "Your pin: 10K ·
+// 1BHK" and the map's own "Your Pin" marker) — formatRs's "Rs. 12,000" is
+// too long for those contexts.
+export function formatRsCompact(amount) {
+  if (amount === null || amount === undefined || amount === "") return "—";
+  const n = Number(amount);
+  if (Number.isNaN(n)) return "—";
+  return n >= 1000 ? `${Math.round(n / 1000)}K` : `${n}`;
+}
+
 export function bhkLabel(bhk) {
   if (bhk === null || bhk === undefined) return "—";
   return bhk >= 5 ? "5+ BHK" : `${bhk}BHK`;

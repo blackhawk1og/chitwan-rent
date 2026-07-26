@@ -43,6 +43,29 @@ router.get("/nearby", async (req, res) => {
   }
 });
 
+// GET /api/stats/nearby-seekers?lat=&lng=&radius=3000
+// Count of seeker_pins within `radius` metres of a point — used by the List
+// My Flat success screen ("N seekers are looking near your flat"). Same
+// fetch-all-then-haversine-filter approach as /nearby above.
+router.get("/nearby-seekers", async (req, res) => {
+  const lat = Number(req.query.lat);
+  const lng = Number(req.query.lng);
+  const radius = Number(req.query.radius) || 3000;
+
+  if (Number.isNaN(lat) || Number.isNaN(lng)) {
+    return res.status(400).json({ error: "lat and lng are required" });
+  }
+
+  try {
+    const result = await query("SELECT lat, lng FROM seeker_pins");
+    const count = result.rows.filter((s) => haversineDistanceMeters(lat, lng, s.lat, s.lng) <= radius).length;
+    res.json({ lat, lng, radius, count });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to compute nearby seeker count" });
+  }
+});
+
 function average(values) {
   return values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : null;
 }

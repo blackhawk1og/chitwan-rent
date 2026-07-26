@@ -41,6 +41,10 @@ CREATE TABLE flats (
   lng DOUBLE PRECISION,
   area TEXT, -- ward/tole name, reverse-geocoded
   photos TEXT[],
+  available_from TEXT CHECK (available_from IN ('asap','next_month','flexible')),
+  flatmate_gender_pref TEXT, -- 'male'|'female'|'any' — only set when listing_type = 'flatmate'
+  food_pref TEXT, -- 'veg'|'non_veg'|'any' — only set when listing_type = 'flatmate'
+  smoker_ok TEXT, -- 'smoker'|'non_smoker' — only set when listing_type = 'flatmate'
   posted_at TIMESTAMP DEFAULT now()
 );
 

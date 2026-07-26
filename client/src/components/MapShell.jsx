@@ -23,9 +23,9 @@ import { useCreateSeekerPin } from "../hooks/useCreateSeekerPin.js";
 import { useCreateToletSpot } from "../hooks/useCreateToletSpot.js";
 import { useCreateRentReport } from "../hooks/useCreateRentReport.js";
 import { usePinDropFlow } from "../hooks/usePinDropFlow.js";
-import { formatRs } from "../lib/format.js";
+import { formatRs, formatRsCompact, bhkLabel } from "../lib/format.js";
 import { DEFAULT_FILTERS, countActiveFilters } from "../lib/filters.js";
-import { createDotIcon, createHandleIcon, createUserLocationIcon } from "../lib/mapIcons.jsx";
+import { createDotIcon, createHandleIcon, createUserLocationIcon, createYourPinIcon } from "../lib/mapIcons.jsx";
 import TopNavPill from "./TopNavPill.jsx";
 import SearchBar from "./SearchBar.jsx";
 import IconStack from "./IconStack.jsx";
@@ -49,6 +49,9 @@ import QuickActionModal from "./QuickActionModal.jsx";
 import RentReportForm from "./RentReportForm.jsx";
 import OutOfBoundsModal from "./OutOfBoundsModal.jsx";
 import AddFlatForm from "./AddFlatForm.jsx";
+import ListFlatBranchModal from "./ListFlatBranchModal.jsx";
+import ListFlatDetailsForm from "./ListFlatDetailsForm.jsx";
+import ListFlatSuccessModal from "./ListFlatSuccessModal.jsx";
 import DropSeekerPinForm from "./DropSeekerPinForm.jsx";
 import SpotToLetModal from "./SpotToLetModal.jsx";
 import SuperheroesModal from "./SuperheroesModal.jsx";
@@ -186,6 +189,27 @@ export default function MapShell() {
     areas,
     isAuthenticated,
   });
+
+  // List My Flat continues past usePinDropFlow's own "form" step into three
+  // more steps (branch choice -> final details -> success/share) — kept as
+  // local state here rather than folded into usePinDropFlow, since that hook
+  // is shared with Find a Flat and must stay unaffected. listFlatFlow.step
+  // stays "form" throughout (draftPin must survive to the end), so
+  // AddFlatForm's own render is additionally gated on !listFlatPostStep.
+  const [listFlatPostStep, setListFlatPostStep] = useState(null); // null | 'branch' | 'details' | 'success'
+  const [listFlatBranch, setListFlatBranch] = useState(null); // 'flat' | 'flatmate'
+  const [listFlatStep0Data, setListFlatStep0Data] = useState(null); // AddFlatForm's submitted fields
+  const [listFlatCreatedFlat, setListFlatCreatedFlat] = useState(null); // API response, used by the success step
+
+  // "Your Pin" marker replacing the plain draggable dot once Step 0 is
+  // submitted — recomputed only when the underlying bhk/rent change.
+  const yourPinIcon = useMemo(() => {
+    if (!listFlatStep0Data) return null;
+    return createYourPinIcon({
+      bhkText: bhkLabel(listFlatStep0Data.bhk),
+      rentText: formatRsCompact(listFlatStep0Data.rent),
+    });
+  }, [listFlatStep0Data]);
 
   // Spot a To-Let: its own lightweight flow — no onboarding step, and the
   // form's fields must survive the "pick on map" detour, so they're lifted
@@ -369,23 +393,62 @@ export default function MapShell() {
     };
   }, []);
 
-  const handleSubmitFlatForm = async (form) => {
+  // AddFlatForm's submit no longer creates the flat directly — it stashes
+  // its fields and hands off to the branch-choice step; the actual POST
+  // happens once Step 2 (final details) is submitted, below.
+  const handleSubmitFlatForm = (form) => {
     if (!listFlatFlow.draftPin) return;
+    setListFlatStep0Data(form);
+    setListFlatPostStep("branch");
+  };
+
+  const handleSelectListFlatBranch = (branch) => {
+    setListFlatBranch(branch);
+    setListFlatPostStep("details");
+  };
+
+  // Step 2's "Cancel" goes back to the branch choice (data already entered
+  // in Step 0/1 is preserved) — distinct from the modal's own "×", which
+  // exits the whole flow (see handleCancelListFlatPostSteps).
+  const handleBackToListFlatBranch = () => {
+    setListFlatPostStep("branch");
+  };
+
+  // Exits the post-form steps entirely without submitting, back to the map
+  // — used by the "×" on the branch/details steps.
+  const handleCancelListFlatPostSteps = () => {
+    setListFlatPostStep(null);
+    setListFlatBranch(null);
+    setListFlatStep0Data(null);
+    listFlatFlow.finish();
+    navigate("/");
+  };
+
+  const handleSubmitListFlatDetails = async (detailsForm) => {
+    if (!listFlatFlow.draftPin || !listFlatStep0Data || !listFlatBranch) return;
+    const step0 = listFlatStep0Data;
+    const isFlatmate = listFlatBranch === "flatmate";
     try {
       const created = await createFlat.mutateAsync({
-        listing_type: "flat",
-        bhk: form.bhk,
-        rent: Number(form.rent),
-        deposit: form.deposit === "" ? null : Number(form.deposit),
-        furnishing: form.furnishing,
-        includes_maintenance: form.includesMaintenance,
-        gated: form.gated,
-        who_lives: form.whoLives,
-        pets_allowed: form.petsAllowed,
-        parking_for: Number(form.parkingFor),
-        sqft: form.sqft === "" ? null : Number(form.sqft),
-        one_liner: form.oneLiner || null,
-        email: form.email || null,
+        listing_type: listFlatBranch,
+        bhk: step0.bhk,
+        rent: Number(step0.rent),
+        deposit: step0.deposit === "" ? null : Number(step0.deposit),
+        furnishing: step0.furnishing,
+        includes_maintenance: step0.includesMaintenance,
+        gated: step0.gated,
+        who_lives: step0.whoLives,
+        pets_allowed: step0.petsAllowed,
+        // Step 2 re-asks parking/email — its values win over Step 0's.
+        parking_for: Number(detailsForm.parkingFor),
+        sqft: step0.sqft === "" ? null : Number(step0.sqft),
+        one_liner: step0.oneLiner || null,
+        email: detailsForm.email || null,
+        phone: detailsForm.phone || null,
+        available_from: detailsForm.availableFrom,
+        flatmate_gender_pref: isFlatmate ? detailsForm.flatmateGenderPref : null,
+        food_pref: isFlatmate ? detailsForm.foodPref : null,
+        smoker_ok: isFlatmate ? detailsForm.smokerOk : null,
         lat: listFlatFlow.draftPin.lat,
         lng: listFlatFlow.draftPin.lng,
         area: listFlatFlow.draftPin.area,
@@ -393,11 +456,22 @@ export default function MapShell() {
       });
       setJustSubmittedFlats((prev) => [...prev, created]);
       mapRef.current?.flyTo([created.lat, created.lng], 16, { duration: 1 });
-      listFlatFlow.finish();
-      navigate("/");
+      setListFlatCreatedFlat(created);
+      setListFlatPostStep("success");
     } catch {
       // error surfaced via createFlat.isError in the form
     }
+  };
+
+  // The flat is already created by the time the success step shows — this
+  // just tidies up local state and returns to the map (Skip/"×"/done).
+  const handleCloseListFlatSuccess = () => {
+    setListFlatPostStep(null);
+    setListFlatBranch(null);
+    setListFlatStep0Data(null);
+    setListFlatCreatedFlat(null);
+    listFlatFlow.finish();
+    navigate("/");
   };
 
   const handleSubmitSeekerForm = async (form) => {
@@ -615,13 +689,16 @@ export default function MapShell() {
         {listFlatFlow.step === "pin-drop" && (
           <PinDropCatcher onPlace={(latlng) => guardPinDrop(latlng, closeRouteModal, listFlatFlow.placePin)} />
         )}
-        {listFlatFlow.step === "form" && listFlatFlow.draftPin && (
+        {listFlatFlow.step === "form" && listFlatFlow.draftPin && !listFlatPostStep && (
           <Marker
             position={[listFlatFlow.draftPin.lat, listFlatFlow.draftPin.lng]}
             icon={draftFlatIcon}
             draggable
             eventHandlers={{ dragend: (e) => listFlatFlow.dragPin(e.target.getLatLng()) }}
           />
+        )}
+        {listFlatPostStep && listFlatFlow.draftPin && yourPinIcon && (
+          <Marker position={[listFlatFlow.draftPin.lat, listFlatFlow.draftPin.lng]} icon={yourPinIcon} />
         )}
 
         {findFlatFlow.step === "pin-drop" && (
@@ -740,14 +817,41 @@ export default function MapShell() {
         />
       )}
 
-      {listFlatFlow.step === "form" && listFlatFlow.draftPin && (
+      {listFlatFlow.step === "form" && listFlatFlow.draftPin && !listFlatPostStep && (
         <AddFlatForm
           onCancel={listFlatFlow.cancelForm}
           onSubmit={handleSubmitFlatForm}
-          submitting={createFlat.isPending}
-          submitError={createFlat.isError ? "Something went wrong — please try again." : null}
+          submitting={false}
+          submitError={null}
           area={listFlatFlow.draftPin.area}
         />
+      )}
+
+      {listFlatPostStep === "branch" && listFlatStep0Data && (
+        <ListFlatBranchModal
+          rentLabel={formatRsCompact(listFlatStep0Data.rent)}
+          bhkLabel={bhkLabel(listFlatStep0Data.bhk)}
+          onSelectFlat={() => handleSelectListFlatBranch("flat")}
+          onSelectFlatmate={() => handleSelectListFlatBranch("flatmate")}
+          onClose={handleCancelListFlatPostSteps}
+        />
+      )}
+
+      {listFlatPostStep === "details" && listFlatStep0Data && listFlatBranch && (
+        <ListFlatDetailsForm
+          mode={listFlatBranch}
+          rentLabel={formatRsCompact(listFlatStep0Data.rent)}
+          bhkLabel={bhkLabel(listFlatStep0Data.bhk)}
+          onBack={handleBackToListFlatBranch}
+          onClose={handleCancelListFlatPostSteps}
+          onSubmit={handleSubmitListFlatDetails}
+          submitting={createFlat.isPending}
+          submitError={createFlat.isError ? "Something went wrong — please try again." : null}
+        />
+      )}
+
+      {listFlatPostStep === "success" && listFlatCreatedFlat && (
+        <ListFlatSuccessModal flat={listFlatCreatedFlat} onClose={handleCloseListFlatSuccess} />
       )}
 
       {findFlatFlow.step === "auth" && (

@@ -264,6 +264,82 @@ export function createFlatInfoChipIcon({ bhk, rent, rating, gated, sizeTier = "b
   });
 }
 
+// "Your Pin" marker shown during the List My Flat post-submit steps
+// (branch choice / final details / success) — a small dark "Your Pin" label
+// stacked above a blue "1BHK · 10K" chip with a pointed tail, replacing the
+// plain draggable draft-pin dot once the location itself is no longer
+// adjustable. Built on a zero-size anchor box with the content absolutely
+// centered over it (translateX(-50%)), since the label/chip's width varies
+// with content and can't be known ahead of a fixed iconAnchor.
+export function createYourPinIcon({ bhkText, rentText }) {
+  const html = renderToStaticMarkup(
+    <div style={{ position: "relative", width: 0, height: 0 }}>
+      <div
+        style={{
+          position: "absolute",
+          bottom: 7,
+          left: 0,
+          transform: "translateX(-50%)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 3,
+          whiteSpace: "nowrap",
+        }}
+      >
+        <span
+          style={{
+            background: "#1a1b2e",
+            color: "#ffffff",
+            fontSize: 10,
+            fontWeight: 700,
+            padding: "3px 9px",
+            borderRadius: 6,
+            boxShadow: "0 2px 6px rgba(0,0,0,0.4)",
+            fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+          }}
+        >
+          Your Pin
+        </span>
+        <span
+          style={{
+            background: "#3b82f6",
+            color: "#ffffff",
+            fontSize: 12,
+            fontWeight: 800,
+            padding: "6px 13px",
+            borderRadius: 9999,
+            boxShadow: "0 3px 8px rgba(0,0,0,0.45)",
+            fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+          }}
+        >
+          {bhkText} · {rentText}
+        </span>
+      </div>
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          transform: "translateX(-50%)",
+          width: 0,
+          height: 0,
+          borderLeft: "5px solid transparent",
+          borderRight: "5px solid transparent",
+          borderTop: "6px solid #3b82f6",
+        }}
+      />
+    </div>
+  );
+
+  return L.divIcon({
+    html,
+    className: "chitwan-pin-icon",
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+  });
+}
+
 // "You are here" marker for Locate Me: a solid blue dot with a white ring
 // and a soft pulsing accuracy halo — the conventional browser-geolocation
 // look, kept deliberately distinct from every other marker type on the map.

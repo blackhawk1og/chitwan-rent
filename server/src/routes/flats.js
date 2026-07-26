@@ -111,24 +111,39 @@ function randomRating() {
 router.post("/", requireAuth, async (req, res) => {
   const {
     listing_type, bhk, rent, deposit, furnishing, includes_maintenance,
-    gated, who_lives, pets_allowed, parking_for, sqft, one_liner, lat, lng, area, photos, email,
+    gated, who_lives, pets_allowed, parking_for, sqft, one_liner, lat, lng, area, photos, email, phone,
+    available_from, flatmate_gender_pref, food_pref, smoker_ok,
   } = req.body;
 
   try {
     if (email) {
       await query("UPDATE users SET email = COALESCE(email, $1) WHERE id = $2", [email, req.userId]);
     }
+    if (phone) {
+      // phone has a UNIQUE constraint — someone else's account may already
+      // hold this number (e.g. a typo, or reusing a shared/test number).
+      // That's a linking side effect, not the point of this request, so it
+      // shouldn't fail the whole listing if it conflicts.
+      try {
+        await query("UPDATE users SET phone = COALESCE(phone, $1) WHERE id = $2", [phone, req.userId]);
+      } catch (phoneErr) {
+        if (phoneErr.code !== "23505") throw phoneErr;
+        console.warn(`Skipped linking phone to user ${req.userId}: already in use by another account.`);
+      }
+    }
 
     const result = await query(
       `INSERT INTO flats
         (owner_id, listing_type, bhk, rent, deposit, furnishing, includes_maintenance,
-         gated, who_lives, pets_allowed, parking_for, sqft, rating, one_liner, status, lat, lng, area, photos)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'pending_review',$15,$16,$17,$18)
+         gated, who_lives, pets_allowed, parking_for, sqft, rating, one_liner, status, lat, lng, area, photos,
+         available_from, flatmate_gender_pref, food_pref, smoker_ok)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'pending_review',$15,$16,$17,$18,$19,$20,$21,$22)
        RETURNING *`,
       [
         req.userId, listing_type ?? "flat", bhk, rent, deposit ?? null, furnishing,
         includes_maintenance ?? false, gated, who_lives ?? null, pets_allowed ?? null,
         parking_for ?? 0, sqft ?? null, randomRating(), one_liner ?? null, lat, lng, area ?? null, photos ?? [],
+        available_from ?? null, flatmate_gender_pref ?? null, food_pref ?? null, smoker_ok ?? null,
       ]
     );
 
@@ -143,6 +158,32 @@ router.post("/", requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to create flat" });
+  }
+});
+
+// PATCH /api/flats/:id/photos  { photos: string[] } — appends to the
+// listing's existing photos, capped at 6 total. Owner-only.
+router.patch("/:id/photos", requireAuth, async (req, res) => {
+  const { photos } = req.body;
+  if (!Array.isArray(photos) || photos.length === 0) {
+    return res.status(400).json({ error: "photos must be a non-empty array" });
+  }
+
+  try {
+    const existing = await query("SELECT owner_id, photos FROM flats WHERE id = $1", [req.params.id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: "Flat not found" });
+    }
+    if (existing.rows[0].owner_id !== req.userId) {
+      return res.status(403).json({ error: "You can only add photos to your own listing" });
+    }
+
+    const combined = [...(existing.rows[0].photos ?? []), ...photos].slice(0, 6);
+    const result = await query("UPDATE flats SET photos = $1 WHERE id = $2 RETURNING *", [combined, req.params.id]);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to add photos" });
   }
 });
 
