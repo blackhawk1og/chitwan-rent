@@ -5,6 +5,7 @@ import Pill from "./ui/Pill.jsx";
 import ToggleButton from "./ui/ToggleButton.jsx";
 import SectionLabel from "./ui/SectionLabel.jsx";
 import TextField from "./ui/TextField.jsx";
+import { isValidEmail, isValidPhone, sanitizePhoneInput } from "../lib/validation.js";
 
 const AVAILABLE_FROM_OPTIONS = [
   { value: "asap", label: "ASAP" },
@@ -39,7 +40,13 @@ export default function ListFlatDetailsForm({
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
   const isFlatmate = mode === "flatmate";
-  const isValid = form.availableFrom !== null && form.parkingFor !== "" && form.email !== "" && form.phone !== "";
+  const emailError = form.email !== "" && !isValidEmail(form.email) ? "Enter a valid email address" : null;
+  const phoneError = form.phone !== "" && !isValidPhone(form.phone) ? "Enter a valid 10-digit mobile number" : null;
+  const isValid =
+    form.availableFrom !== null &&
+    form.parkingFor !== "" &&
+    isValidEmail(form.email) &&
+    isValidPhone(form.phone);
 
   const handleSubmit = () => {
     if (!isValid || submitting) return;
@@ -178,14 +185,17 @@ export default function ListFlatDetailsForm({
           placeholder="you@gmail.com"
           value={form.email}
           onChange={(e) => set({ email: e.target.value })}
+          error={emailError}
         />
 
         <TextField
           label="Phone number *"
           type="tel"
+          inputMode="numeric"
           placeholder="10-digit mobile"
           value={form.phone}
-          onChange={(e) => set({ phone: e.target.value })}
+          onChange={(e) => set({ phone: sanitizePhoneInput(e.target.value) })}
+          error={phoneError}
           helper="Private — only shared with matched seekers."
         />
       </div>

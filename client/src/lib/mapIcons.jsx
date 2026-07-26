@@ -102,7 +102,20 @@ function poiPinSvg(width, height, badgeColor, glow = false) {
       height={height}
       viewBox="0 0 24 32"
       className={glow ? "animate-pin-glow-blink" : undefined}
-      style={{ position: "absolute", top: 0, left: 0, filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.55))" }}
+      // z-index:0 is deliberate, not decorative: `filter` makes this SVG
+      // establish its own stacking context, which left to "auto" can paint
+      // ambiguously against a later position:absolute sibling with no
+      // stacking context of its own (the icon glyph layer below) — that's
+      // what was making category glyphs like the hospital "H" invisible.
+      // Pinning explicit z-index on both this and the glyph layer removes
+      // the ambiguity outright.
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        zIndex: 0,
+        filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.55))",
+      }}
     >
       <path d={POI_PIN_PATH} fill="#ffffff" stroke="rgba(0,0,0,0.18)" strokeWidth="1" />
       <circle cx={POI_BADGE_CENTER.x} cy={POI_BADGE_CENTER.y} r={POI_BADGE_RADIUS} fill={badgeColor} />
@@ -131,6 +144,7 @@ export function createPoiPinIcon(IconComponent, { bg = "#38bdf8", size = 28, glo
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          zIndex: 1,
         }}
       >
         <IconComponent size={size * 0.38} color="#ffffff" />
@@ -170,6 +184,7 @@ export function createLabeledPoiIcon(IconComponent, label, { bg = "#38bdf8", glo
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            zIndex: 1,
           }}
         >
           <IconComponent size={pinWidth * 0.4} color="#ffffff" />

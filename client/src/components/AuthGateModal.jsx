@@ -3,6 +3,7 @@ import { UserCircle2 } from "lucide-react";
 import Modal from "./Modal.jsx";
 import TextField from "./ui/TextField.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import { isValidEmail, isValidPhone, sanitizePhoneInput } from "../lib/validation.js";
 
 export default function AuthGateModal({ onSuccess, onCancel }) {
   const { login } = useAuth();
@@ -12,7 +13,9 @@ export default function AuthGateModal({ onSuccess, onCancel }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  const isValid = email.trim() !== "" || phone.trim() !== "";
+  const emailError = email.trim() !== "" && !isValidEmail(email) ? "Enter a valid email address" : null;
+  const phoneError = phone.trim() !== "" && !isValidPhone(phone) ? "Enter a valid 10-digit mobile number" : null;
+  const isValid = (email.trim() !== "" || phone.trim() !== "") && !emailError && !phoneError;
 
   const handleSubmit = async () => {
     if (!isValid || submitting) return;
@@ -56,13 +59,16 @@ export default function AuthGateModal({ onSuccess, onCancel }) {
           placeholder="you@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          error={emailError}
         />
         <TextField
           label="Phone"
           type="tel"
+          inputMode="numeric"
           placeholder="98XXXXXXXX"
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
+          error={phoneError}
         />
         <p className="text-xs text-text-muted">At least one of email or phone is required.</p>
       </div>

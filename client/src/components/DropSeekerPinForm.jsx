@@ -7,6 +7,7 @@ import SectionLabel from "./ui/SectionLabel.jsx";
 import TextField from "./ui/TextField.jsx";
 import { useNearbyStats } from "../hooks/useNearbyStats.js";
 import { formatRs } from "../lib/format.js";
+import { isValidEmail, isValidPhone, sanitizePhoneInput } from "../lib/validation.js";
 
 const BHK_PREF_OPTIONS = [
   { value: "1", label: "1" },
@@ -55,7 +56,13 @@ export default function DropSeekerPinForm({ lat, lng, onCancel, onSubmit, submit
   const [form, setForm] = useState(initialForm);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
-  const isValid = form.lookingFor !== null && form.budget !== "" && form.email !== "" && form.phone !== "";
+  const emailError = form.email !== "" && !isValidEmail(form.email) ? "Enter a valid email address" : null;
+  const phoneError = form.phone !== "" && !isValidPhone(form.phone) ? "Enter a valid 10-digit mobile number" : null;
+  const isValid =
+    form.lookingFor !== null &&
+    form.budget !== "" &&
+    isValidEmail(form.email) &&
+    isValidPhone(form.phone);
 
   const handleSubmit = () => {
     if (!isValid || submitting) return;
@@ -221,14 +228,17 @@ export default function DropSeekerPinForm({ lat, lng, onCancel, onSubmit, submit
             placeholder="you@example.com"
             value={form.email}
             onChange={(e) => set({ email: e.target.value })}
+            error={emailError}
           />
 
           <TextField
             label="Phone number *"
             type="tel"
+            inputMode="numeric"
             placeholder="98XXXXXXXX"
             value={form.phone}
-            onChange={(e) => set({ phone: e.target.value })}
+            onChange={(e) => set({ phone: sanitizePhoneInput(e.target.value) })}
+            error={phoneError}
             helper="Private — only shared when we find a match for you."
           />
         </div>
