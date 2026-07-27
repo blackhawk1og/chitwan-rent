@@ -14,6 +14,7 @@ import {
 import { haversineMeters } from "../lib/geo.js";
 import { useFlats } from "../hooks/useFlats.js";
 import { useAreas } from "../hooks/useAreas.js";
+import { usePlaces } from "../hooks/usePlaces.js";
 import { useToletSpots } from "../hooks/useToletSpots.js";
 import { useBusRoutes } from "../hooks/useBusRoutes.js";
 import { usePois } from "../hooks/usePois.js";
@@ -126,6 +127,7 @@ export default function MapShell() {
 
   const { data: flats = [], isLoading: flatsLoading } = useFlats(filters);
   const { data: areas = [] } = useAreas();
+  const { data: places = [] } = usePlaces();
   const { data: toletSpots = [] } = useToletSpots(filters.showToletBoards);
   const { data: busRoutes = [] } = useBusRoutes(busRoutesOn);
   const { data: schoolPois = [] } = usePois("school,college", schoolsOn);
@@ -729,6 +731,7 @@ export default function MapShell() {
               value={searchValue}
               onChange={setSearchValue}
               areas={areas}
+              places={places}
               onSelectLocation={handleSelectLocation}
               onFilterClick={() => setQuickModal("filters")}
               filterCount={filterCount}
@@ -746,6 +749,7 @@ export default function MapShell() {
               value={searchValue}
               onChange={setSearchValue}
               areas={areas}
+              places={places}
               onSelectLocation={handleSelectLocation}
               onFilterClick={() => setQuickModal("filters")}
               filterCount={filterCount}

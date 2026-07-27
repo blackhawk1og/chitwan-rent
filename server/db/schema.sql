@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS seeker_pins CASCADE;
 DROP TABLE IF EXISTS flats CASCADE;
 DROP TABLE IF EXISTS bus_routes CASCADE;
 DROP TABLE IF EXISTS pois CASCADE;
+DROP TABLE IF EXISTS places CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
 CREATE TABLE users (
@@ -137,6 +138,20 @@ CREATE TABLE pois (
   lng DOUBLE PRECISION,
   tier TEXT -- 'important' for school/college (real OSM data); NULL for dummy categories
 );
+
+-- Search bar typeahead gazetteer — general locality names (villages, towns,
+-- suburbs, neighbourhoods, hamlets) pulled from OSM, separate from `pois`
+-- (specific named venues) and from the small curated ward list seed.js uses
+-- for dummy-listing density (that one stays as-is for the filter dropdown).
+CREATE TABLE places (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  place_type TEXT, -- 'village'|'town'|'suburb'|'neighbourhood'|'hamlet'
+  lat DOUBLE PRECISION,
+  lng DOUBLE PRECISION
+);
+
+CREATE INDEX idx_places_name ON places(name);
 
 -- Anonymous rent data points from the empty-map "Add something here" quick
 -- action — no owner_id/user_id by design. Feeds future Area Stats

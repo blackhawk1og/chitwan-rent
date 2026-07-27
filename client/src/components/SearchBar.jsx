@@ -2,6 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { Search, SlidersHorizontal, MapPin, Loader2 } from "lucide-react";
 import { CHITWAN_NOMINATIM_VIEWBOX } from "../lib/mapConfig.js";
 
+// Lowercases and strips diacritics/accents so e.g. "chandragiri" and a
+// future "Chandragiri" with combining marks are treated as equivalent —
+// belt-and-braces for Nepali place-name transliterations, even though
+// today's seeded area names are all plain ASCII.
+function normalize(s) {
+  return s
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+}
+
 async function searchNominatim(q) {
   const url = new URL("https://nominatim.openstreetmap.org/search");
   url.searchParams.set("format", "json");
@@ -25,6 +36,7 @@ export default function SearchBar({
   value,
   onChange,
   areas = [],
+  places = [],
   onSelectLocation,
   onFilterClick,
   filterCount = 0,
@@ -35,13 +47,34 @@ export default function SearchBar({
   const [loadingNominatim, setLoadingNominatim] = useState(false);
 
   const localMatches = useMemo(() => {
-    const q = value.trim().toLowerCase();
+    const q = normalize(value.trim());
     if (!q) return [];
-    return areas
-      .filter((a) => a.area.toLowerCase().includes(q))
+
+    // Candidates keyed by normalized name so a name appearing in both
+    // sources collapses to one entry — `places` (real OSM villages/towns/
+    // suburbs/etc.) is merged in AFTER `areas` (flat listing locations,
+    // some still backed by only an approximate seed centroid) so it wins
+    // the collision, giving the more accurate real-world coordinate.
+    const byName = new Map();
+    for (const a of areas) byName.set(normalize(a.area), { name: a.area, lat: a.lat, lng: a.lng });
+    for (const p of places) byName.set(normalize(p.name), { name: p.name, lat: p.lat, lng: p.lng });
+
+    // Exact match (the whole name, not just the typed prefix) ranks above a
+    // pure prefix match, which ranks above a mid-string substring match;
+    // ties broken alphabetically so results don't reorder based on
+    // incidental area-count/name sort order from the source lists.
+    const rank = (normalizedName) => {
+      if (normalizedName === q) return 0;
+      if (normalizedName.startsWith(q)) return 1;
+      return 2;
+    };
+
+    return [...byName.entries()]
+      .filter(([normalizedName]) => normalizedName.includes(q))
+      .sort(([nameA, a], [nameB, b]) => rank(nameA) - rank(nameB) || a.name.localeCompare(b.name))
       .slice(0, 6)
-      .map((a) => ({ label: a.area, lat: Number(a.lat), lng: Number(a.lng), source: "local" }));
-  }, [value, areas]);
+      .map(([, c]) => ({ label: c.name, lat: Number(c.lat), lng: Number(c.lng), source: "local" }));
+  }, [value, areas, places]);
 
   useEffect(() => {
     const q = value.trim();
@@ -89,7 +122,15 @@ export default function SearchBar({
         </div>
 
         {showDropdown && (
-          <div className="absolute left-0 top-full mt-2 w-full overflow-hidden rounded-2xl border border-white/10 bg-surface shadow-2xl">
+          // Explicit z-index (not just being position:absolute) is required
+          // here: the nav pill row below uses backdrop-blur, which — like
+          // `filter` — creates its own stacking context even without a
+          // position/z-index of its own. That promotes the pills into the
+          // same auto-z-index paint bucket as this dropdown, where later DOM
+          // order (the pills render after the search bar) would otherwise
+          // win and paint them on top. A z-index with an explicit value
+          // moves the dropdown to the next bucket up, clear of that fight.
+          <div className="absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-2xl border border-white/10 bg-surface shadow-2xl">
             {loadingNominatim && suggestions.length === 0 ? (
               <div className="flex items-center gap-2 px-4 py-3 text-sm text-text-muted">
                 <Loader2 size={14} className="animate-spin" />

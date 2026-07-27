@@ -11,7 +11,9 @@
     "db:seed": "node db/seed.js",
     "seed:bus-routes": "node db/seed-bus-routes.js",
     "seed:pois": "node db/seed-pois.js",
-    "seed:general-pois": "node db/seed-general-pois.js"
+    "seed:general-pois": "node db/seed-general-pois.js",
+    "add:places-table": "node db/add-places-table.js",
+    "seed:places": "node db/seed-places.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

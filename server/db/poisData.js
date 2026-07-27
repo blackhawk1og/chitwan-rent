@@ -9,7 +9,7 @@ export const CHITWAN_BBOX = { south: 27.45, west: 84.15, north: 27.8, east: 84.6
 const OVERPASS_MAX_ATTEMPTS = 4;
 const OVERPASS_RETRY_DELAY_MS = 8000;
 
-async function queryOverpass(query) {
+export async function queryOverpass(query) {
   for (let attempt = 1; attempt <= OVERPASS_MAX_ATTEMPTS; attempt++) {
     const res = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST",

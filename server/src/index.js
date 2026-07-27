@@ -9,6 +9,7 @@ import statsRouter from "./routes/stats.js";
 import superheroesRouter from "./routes/superheroes.js";
 import busRoutesRouter from "./routes/busRoutes.js";
 import poisRouter from "./routes/pois.js";
+import placesRouter from "./routes/places.js";
 import authRouter from "./routes/auth.js";
 import rentReportsRouter from "./routes/rentReports.js";
 
@@ -31,6 +32,7 @@ app.use("/api/stats", statsRouter);
 app.use("/api/superheroes", superheroesRouter);
 app.use("/api/bus-routes", busRoutesRouter);
 app.use("/api/pois", poisRouter);
+app.use("/api/places", placesRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/rent-reports", rentReportsRouter);
 
