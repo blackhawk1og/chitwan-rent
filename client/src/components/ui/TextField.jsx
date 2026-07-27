@@ -10,7 +10,7 @@ export default function TextField({ label, prefix, suffix, helper, error, ...inp
         {prefix && <span className="text-sm text-text-muted">{prefix}</span>}
         <input
           {...inputProps}
-          className="w-full min-w-0 bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
+          className="w-full min-w-0 [appearance:textfield] bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
         {suffix && <span className="shrink-0 text-sm text-text-muted">{suffix}</span>}
       </div>

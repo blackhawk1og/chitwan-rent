@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
 import { Marker, useMap, useMapEvents } from "react-leaflet";
 import { MdRestaurant, MdLocalCafe, MdLocalPharmacy, MdTempleBuddhist, MdAccountBalance, MdPlace } from "react-icons/md";
-import { createPoiPinIcon, createLabeledPoiIcon } from "../lib/mapIcons.jsx";
-import { CATEGORY_TIER, POI_LABEL_ZOOM, POI_COLOR, poiTierForZoom } from "../lib/poiTiers.js";
+import { createLabeledPoiIcon } from "../lib/mapIcons.jsx";
+import { CATEGORY_TIER, POI_COLOR, poiTierForZoom } from "../lib/poiTiers.js";
 
 // Real-world hospital signage (and Google Maps' own hospital pins) uses a
 // bold plain "H" rather than a detailed pictogram — matches that convention
 // instead of react-icons' more illustrative hospital/medical-bag glyphs.
 // Accepts the same {size, color} props every other icon component here
-// does, so it drops into createPoiPinIcon/createLabeledPoiIcon unchanged.
+// does, so it drops into createLabeledPoiIcon unchanged.
 function HospitalLetterIcon({ size, color }) {
   return (
     <span style={{ fontSize: size, fontWeight: 800, color, lineHeight: 1, fontFamily: "Arial, sans-serif" }}>H</span>
@@ -102,7 +102,6 @@ export default function GeneralPoisLayer({ pois }) {
   });
 
   const activeTier = poiTierForZoom(zoom);
-  const showLabels = zoom >= POI_LABEL_ZOOM;
 
   // Every POI whose tier has been reached is a candidate to render as its
   // own pin — no clustering at any density. Below tier 1, nothing renders.
@@ -113,18 +112,20 @@ export default function GeneralPoisLayer({ pois }) {
 
   const declutteredPois = useMemo(() => declutterPois(visiblePois, map, zoom), [visiblePois, map, zoom]);
 
+  // Every category here reveals icon and label together at its own tier
+  // zoom — no separate label-reveal offset like PoisLayer.jsx's schools use.
+  // See getHalfwayLabelZoom in poiTiers.js if a delayed-label category is
+  // ever needed here too.
   const icons = useMemo(
     () =>
       Object.fromEntries(
         declutteredPois.map((p) => {
           const style = CATEGORY_STYLE[p.category] ?? { Icon: MdPlace, bg: "#6b7280" };
-          const icon = showLabels
-            ? createLabeledPoiIcon(style.Icon, p.name, { bg: style.bg })
-            : createPoiPinIcon(style.Icon, { bg: style.bg, size: 26 });
+          const icon = createLabeledPoiIcon(style.Icon, p.name, { bg: style.bg });
           return [p.id, icon];
         })
       ),
-    [declutteredPois, showLabels]
+    [declutteredPois]
   );
 
   return (

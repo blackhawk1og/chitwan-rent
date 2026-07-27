@@ -13,7 +13,6 @@ import {
 } from "../lib/mapConfig.js";
 import { haversineMeters } from "../lib/geo.js";
 import { useFlats } from "../hooks/useFlats.js";
-import { useSeekerPins } from "../hooks/useSeekerPins.js";
 import { useAreas } from "../hooks/useAreas.js";
 import { useToletSpots } from "../hooks/useToletSpots.js";
 import { useBusRoutes } from "../hooks/useBusRoutes.js";
@@ -32,7 +31,6 @@ import IconStack from "./IconStack.jsx";
 import OnboardingModal, { isOnboardingDismissed } from "./OnboardingModal.jsx";
 import FilterModal from "./FilterModal.jsx";
 import FlatsLayer from "./FlatsLayer.jsx";
-import SeekersLayer from "./SeekersLayer.jsx";
 import ToletSpotsLayer from "./ToletSpotsLayer.jsx";
 import BusRoutesLayer from "./BusRoutesLayer.jsx";
 import PoisLayer from "./PoisLayer.jsx";
@@ -122,13 +120,11 @@ export default function MapShell() {
   const [satelliteOn, setSatelliteOn] = useState(false);
   const [busRoutesOn, setBusRoutesOn] = useState(false);
   const [schoolsOn, setSchoolsOn] = useState(false);
-  const [showSeekers, setShowSeekers] = useState(false);
 
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const filterCount = countActiveFilters(filters);
 
   const { data: flats = [], isLoading: flatsLoading } = useFlats(filters);
-  const { data: seekerPins = [] } = useSeekerPins();
   const { data: areas = [] } = useAreas();
   const { data: toletSpots = [] } = useToletSpots(filters.showToletBoards);
   const { data: busRoutes = [] } = useBusRoutes(busRoutesOn);
@@ -143,7 +139,6 @@ export default function MapShell() {
   const [expandedItem, setExpandedItem] = useState(null); // same shape, drives the full detail card
 
   const [justSubmittedFlats, setJustSubmittedFlats] = useState([]);
-  const [justSubmittedSeekerPins, setJustSubmittedSeekerPins] = useState([]);
   const [justSubmittedToletSpots, setJustSubmittedToletSpots] = useState([]);
   const createFlat = useCreateFlat();
   const createSeekerPin = useCreateSeekerPin();
@@ -250,12 +245,6 @@ export default function MapShell() {
     const existingIds = new Set(flats.map((f) => f.id));
     return [...flats, ...justSubmittedFlats.filter((f) => !existingIds.has(f.id))];
   }, [flats, justSubmittedFlats]);
-
-  const displayedSeekerPins = useMemo(() => {
-    if (!justSubmittedSeekerPins.length) return seekerPins;
-    const existingIds = new Set(seekerPins.map((s) => s.id));
-    return [...seekerPins, ...justSubmittedSeekerPins.filter((s) => !existingIds.has(s.id))];
-  }, [seekerPins, justSubmittedSeekerPins]);
 
   const displayedToletSpots = useMemo(() => {
     const base = filters.showToletBoards ? toletSpots : [];
@@ -494,7 +483,6 @@ export default function MapShell() {
         lng: findFlatFlow.draftPin.lng,
         area: findFlatFlow.draftPin.area,
       });
-      setJustSubmittedSeekerPins((prev) => [...prev, created]);
       mapRef.current?.flyTo([created.lat, created.lng], 16, { duration: 1 });
       findFlatFlow.finish();
       navigate("/");
@@ -659,12 +647,6 @@ export default function MapShell() {
         {!pinsHidden && (
           <>
             <FlatsLayer flats={displayedFlats} onSelect={(flat) => setExpandedItem({ type: "flat", data: flat })} />
-            {showSeekers && (
-              <SeekersLayer
-                seekerPins={displayedSeekerPins}
-                onSelect={(seeker) => setSelectedItem({ type: "seeker", data: seeker })}
-              />
-            )}
             <ToletSpotsLayer spots={displayedToletSpots} />
             {schoolsOn && <PoisLayer pois={schoolPois} />}
             <GeneralPoisLayer pois={generalPois} />
@@ -785,8 +767,6 @@ export default function MapShell() {
             onToggleSchools={() => setSchoolsOn((v) => !v)}
             satelliteOn={satelliteOn}
             onToggleSatellite={() => setSatelliteOn((v) => !v)}
-            showSeekers={showSeekers}
-            onToggleSeekers={() => setShowSeekers((v) => !v)}
             onMore={() => setQuickModal("more")}
           />
         </div>

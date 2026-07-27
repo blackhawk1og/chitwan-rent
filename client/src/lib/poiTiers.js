@@ -22,6 +22,21 @@ export const POI_TIER_4_ZOOM = 17; // + cafes
 export const POI_TIER_5_ZOOM = 18; // + pharmacies — everything now visible
 export const POI_LABEL_ZOOM = 18; // icon-only below this; icon+label at/above it
 
+// The map's own max zoom (matches the default every TileLayer in this app
+// uses — none override it). The ceiling getHalfwayLabelZoom interpolates
+// toward for categories that use a proportional, rather than flat, gap
+// between their icon-reveal zoom and their label-reveal zoom.
+export const MAP_MAX_ZOOM = 18;
+
+// Halfway point between a category's icon-reveal zoom and the map's max
+// zoom — for categories whose label should reveal proportionally to how far
+// zoomed in the user already is, rather than at a fixed icon-to-label gap
+// like POI_LABEL_ZOOM. Named and exported so it's easy to apply to another
+// category later without re-deriving the formula inline.
+export function getHalfwayLabelZoom(iconZoom, maxZoom) {
+  return iconZoom + (maxZoom - iconZoom) / 2;
+}
+
 // Category -> tier. Where OSM/our data doesn't distinguish "major" from
 // "minor" within one category (e.g. every temple is just category="temple"),
 // the whole category is assigned a single tier judged by its typical
