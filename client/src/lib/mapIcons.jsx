@@ -218,6 +218,73 @@ export function createLabeledPoiIcon(IconComponent, label, { bg = "#38bdf8", glo
   });
 }
 
+// Solid-fill teardrop with a small white "punch-hole" near the top — the
+// classic Google Maps search-result pin silhouette, deliberately different
+// from the POI pins above (white body + small colored badge) so a picked
+// search result never reads as just another POI category. Reuses the same
+// 24x32 pin geometry (POI_PIN_PATH/POI_BADGE_CENTER) and the exact
+// label-beside-pin layout createLabeledPoiIcon uses (flex row, align-items:
+// flex-end, iconAnchor = [pinWidth/2, pinHeight]) so the tip still anchors
+// correctly to the real lat/lng regardless of the label's width. Pink is
+// unused by every other marker/chip on the map (education is purple, medical
+// is red, food is orange, landmarks are green, temples are gray, gated/
+// user-location/your-pin are blue, the find-a-flat draft pin is teal) so this
+// always reads as visually distinct.
+const SEARCH_PIN_COLOR = "#E91E63";
+
+// Marker dropped at a selected search result (local gazetteer or Nominatim
+// fallback — both resolve to the same {label, lat, lng} shape in
+// SearchBar.jsx, so one icon factory covers both). `label` is optional so a
+// bare pin can still be requested without a caption.
+export function createSearchResultPinIcon(label) {
+  const pinWidth = 28;
+  const pinHeight = Math.round(pinWidth * (32 / 24));
+
+  const html = renderToStaticMarkup(
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 4 }}>
+      <svg
+        width={pinWidth}
+        height={pinHeight}
+        viewBox="0 0 24 32"
+        style={{ flexShrink: 0, filter: "drop-shadow(0 2px 5px rgba(0,0,0,0.6))" }}
+      >
+        <path d={POI_PIN_PATH} fill={SEARCH_PIN_COLOR} stroke="#ffffff" strokeWidth="1.5" />
+        <circle cx={POI_BADGE_CENTER.x} cy={POI_BADGE_CENTER.y} r={4} fill="#ffffff" />
+      </svg>
+      {label && (
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: "#fff",
+            background: "rgba(11,12,23,0.85)",
+            padding: "2px 8px",
+            borderRadius: 6,
+            whiteSpace: "nowrap",
+            maxWidth: 220,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.4)",
+          }}
+        >
+          {label}
+        </span>
+      )}
+    </div>
+  );
+
+  return L.divIcon({
+    html,
+    className: "chitwan-pin-icon",
+    iconSize: null,
+    // Pin's bottom tip, same reasoning as createLabeledPoiIcon: flex-end
+    // aligns the taller pin's own bottom to the row's bottom edge, so the
+    // label beside it doesn't shift the anchor point.
+    iconAnchor: [pinWidth / 2, pinHeight],
+  });
+}
+
 // Marker background by gated status: blue for gated societies, orange for
 // not gated. Falls back to the neutral dark chip when gated status is unset.
 const GATED_CHIP_BG = {

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker } from "react-leaflet";
 import { Compass, KeyRound, Search, Ruler } from "lucide-react";
@@ -25,7 +25,13 @@ import { useCreateRentReport } from "../hooks/useCreateRentReport.js";
 import { usePinDropFlow } from "../hooks/usePinDropFlow.js";
 import { formatRs, formatRsCompact, bhkLabel } from "../lib/format.js";
 import { DEFAULT_FILTERS, countActiveFilters } from "../lib/filters.js";
-import { createDotIcon, createHandleIcon, createUserLocationIcon, createYourPinIcon } from "../lib/mapIcons.jsx";
+import {
+  createDotIcon,
+  createHandleIcon,
+  createUserLocationIcon,
+  createYourPinIcon,
+  createSearchResultPinIcon,
+} from "../lib/mapIcons.jsx";
 import TopNavPill from "./TopNavPill.jsx";
 import SearchBar from "./SearchBar.jsx";
 import IconStack from "./IconStack.jsx";
@@ -116,6 +122,20 @@ export default function MapShell() {
   };
 
   const [searchValue, setSearchValue] = useState("");
+  // The pin dropped at a picked search result — {label, lat, lng} or null.
+  // Setting it always replaces whatever was there before (no stacking, see
+  // handleSelectLocation); this effect is the other half of that lifecycle,
+  // clearing it once the input is emptied out rather than left stale from a
+  // prior search.
+  const [searchResult, setSearchResult] = useState(null);
+  useEffect(() => {
+    if (!searchValue.trim()) setSearchResult(null);
+  }, [searchValue]);
+  const searchResultIcon = useMemo(
+    () => (searchResult ? createSearchResultPinIcon(searchResult.label) : null),
+    [searchResult]
+  );
+
   const [quickModal, setQuickModal] = useState(null); // 'spot-a-tolet' | 'more' | 'filters' | null
 
   const [satelliteOn, setSatelliteOn] = useState(false);
@@ -259,6 +279,7 @@ export default function MapShell() {
 
   const handleSelectLocation = (suggestion) => {
     mapRef.current?.flyTo([suggestion.lat, suggestion.lng], 15, { duration: 1.2 });
+    setSearchResult(suggestion);
   };
 
   // Empty-map-tap quick action chooser and its four destinations. The
@@ -698,6 +719,14 @@ export default function MapShell() {
         )}
 
         {userLocation && <Marker position={[userLocation.lat, userLocation.lng]} icon={userLocationIcon} />}
+
+        {searchResult && (
+          <Marker
+            position={[searchResult.lat, searchResult.lng]}
+            icon={searchResultIcon}
+            zIndexOffset={1000}
+          />
+        )}
 
         {!mapClickCaptured && !quickAction && <EmptyTapCatcher onEmptyTap={handleEmptyMapTap} />}
       </MapContainer>
