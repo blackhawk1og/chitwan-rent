@@ -15,7 +15,8 @@
     "add:places-table": "node db/add-places-table.js",
     "seed:places": "node db/seed-places.js",
     "add:flats-society-name": "node db/add-flats-society-name.js",
-    "add:flats-is-seed": "node db/add-flats-is-seed.js"
+    "add:flats-is-seed": "node db/add-flats-is-seed.js",
+    "add:flat-reports-table": "node db/add-flat-reports-table.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

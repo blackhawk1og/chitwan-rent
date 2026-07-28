@@ -37,11 +37,30 @@ export default {
             filter: "drop-shadow(0 0 2px rgba(255,255,255,0.95)) drop-shadow(0 0 4px rgba(66,133,244,0.95))",
           },
         },
+        // Slow ambient glow for StatusBanner (Avlb Flats / List My Flat /
+        // Find a Flat's status cards) — one keyframe per accent color since
+        // those are the only three StatusBanner ever uses, matching the
+        // banner's own bg-accent-* fill rather than a single fixed hue.
+        "card-glow-teal": {
+          "0%, 100%": { boxShadow: "0 0 12px 1px rgba(20,184,166,0.45)" },
+          "50%": { boxShadow: "0 0 26px 6px rgba(20,184,166,0.85)" },
+        },
+        "card-glow-purple": {
+          "0%, 100%": { boxShadow: "0 0 12px 1px rgba(124,58,237,0.45)" },
+          "50%": { boxShadow: "0 0 26px 6px rgba(124,58,237,0.85)" },
+        },
+        "card-glow-orange": {
+          "0%, 100%": { boxShadow: "0 0 12px 1px rgba(245,158,11,0.45)" },
+          "50%": { boxShadow: "0 0 26px 6px rgba(245,158,11,0.85)" },
+        },
       },
       animation: {
         "attention-pulse": "attention-pulse 0.6s ease-in-out 3",
         "locate-pulse": "locate-pulse 1.8s ease-out infinite",
         "pin-glow-blink": "pin-glow-blink 0.5s ease-in-out 1",
+        "card-glow-teal": "card-glow-teal 2.2s ease-in-out infinite",
+        "card-glow-purple": "card-glow-purple 2.2s ease-in-out infinite",
+        "card-glow-orange": "card-glow-orange 2.2s ease-in-out infinite",
       },
     },
   },

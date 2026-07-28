@@ -28,6 +28,7 @@ import { formatRs, bhkLabel, formatRelativeTime } from "../lib/format.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useRateFlat } from "../hooks/useRateFlat.js";
 import { useFlatInterest } from "../hooks/useFlatInterest.js";
+import { useReportFlat } from "../hooks/useReportFlat.js";
 
 const PETS_LABEL = { yes: "Pets OK", no: "Not Allowed", not_sure: "Pets: Not Sure" };
 const WHO_LIVES_LABEL = { family: "Family", bachelor: "Bachelor" };
@@ -59,12 +60,13 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
   const { isAuthenticated } = useAuth();
   const rateFlat = useRateFlat(flat.id);
   const flatInterest = useFlatInterest(flat.id);
+  const reportFlat = useReportFlat(flat.id);
 
   const [shareCopied, setShareCopied] = useState(false);
   const [reported, setReported] = useState(false);
   const [sqftUnit, setSqftUnit] = useState("ft");
 
-  const [authGate, setAuthGate] = useState(null); // 'rating' | 'interest' | 'comment' | null
+  const [authGate, setAuthGate] = useState(null); // 'rating' | 'interest' | 'comment' | 'report' | null
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
   const [pendingStars, setPendingStars] = useState(0);
   const [interestFormOpen, setInterestFormOpen] = useState(false);
@@ -131,6 +133,15 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
     setInterestFormOpen(true);
   };
 
+  const handleReport = () => {
+    if (reported || reportFlat.isPending) return;
+    if (!isAuthenticated) {
+      setAuthGate("report");
+      return;
+    }
+    reportFlat.mutate(undefined, { onSuccess: () => setReported(true) });
+  };
+
   const handleAuthSuccess = () => {
     const target = authGate;
     setAuthGate(null);
@@ -139,6 +150,8 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
       setRatingModalOpen(true);
     } else if (target === "interest") {
       setInterestFormOpen(true);
+    } else if (target === "report") {
+      reportFlat.mutate(undefined, { onSuccess: () => setReported(true) });
     }
   };
 
@@ -180,11 +193,12 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
             </button>
             <button
               type="button"
-              onClick={() => setReported(true)}
+              onClick={handleReport}
+              disabled={reported}
               aria-label="Report listing"
               className={`flex h-9 w-9 items-center justify-center rounded-full transition ${
                 reported
-                  ? "bg-red-500/20 text-red-400"
+                  ? "cursor-not-allowed bg-red-500/20 text-red-400"
                   : "bg-surface-alt text-text-muted hover:bg-white/10 hover:text-text-primary"
               }`}
             >

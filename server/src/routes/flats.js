@@ -23,6 +23,13 @@ router.get("/", async (req, res) => {
   if (status) {
     params.push(status);
     conditions.push(`f.status = $${params.length}`);
+    // "Available" is meant as "genuinely rentable right now" — a demo/seed
+    // listing (flats.is_seed) is never actually rentable regardless of its
+    // status column, so filtering to available flats has to exclude those
+    // too, not just match on status. No other status value currently has a
+    // filter UI that uses it, so this is scoped to 'available' specifically
+    // rather than excluding is_seed rows from every status filter.
+    if (status === "available") conditions.push(`f.is_seed = false`);
   }
 
   if (bhk) {
@@ -245,6 +252,29 @@ router.post("/:id/rating", requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to submit rating" });
+  }
+});
+
+// POST /api/flats/:id/report  { reason? }
+router.post("/:id/report", requireAuth, async (req, res) => {
+  const reason = req.body?.reason?.trim() || null;
+
+  try {
+    await query(
+      "INSERT INTO flat_reports (flat_id, user_id, reason) VALUES ($1, $2, $3)",
+      [req.params.id, req.userId, reason]
+    );
+    const result = await query(
+      "UPDATE flats SET report_count = report_count + 1 WHERE id = $1 RETURNING report_count",
+      [req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Flat not found" });
+    }
+    res.status(201).json({ report_count: result.rows[0].report_count });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to submit report" });
   }
 });
 

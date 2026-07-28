@@ -46,7 +46,14 @@ export default function FlatsLayer({ flats, onSelect }) {
       Object.fromEntries(
         flats.map((flat) => [
           flat.id,
-          createFlatInfoChipIcon({ bhk: flat.bhk, rent: flat.rent, rating: flat.rating, gated: flat.gated, sizeTier }),
+          createFlatInfoChipIcon({
+            bhk: flat.bhk,
+            rent: flat.rent,
+            rating: flat.rating,
+            gated: flat.gated,
+            sizeTier,
+            reportCount: flat.report_count,
+          }),
         ])
       ),
     [flats, sizeTier]
@@ -58,6 +65,16 @@ export default function FlatsLayer({ flats, onSelect }) {
       maxClusterRadius={60}
       spiderfyOnMaxZoom
       showCoverageOnHover={false}
+      // Two flats can sit at (near-)identical coordinates — zooming further
+      // can never split that pair apart, so at max zoom Leaflet.markercluster
+      // "spiderfies" them (fans them out from the cluster's own default
+      // circle-layout spacing) instead. That default spacing (25px foot
+      // separation for a 2-member circle, ~32px apart center-to-center) was
+      // tuned for small round pin icons, not our ~90px-wide flat info chips —
+      // undersized, the two chips ended up rendering on top of each other.
+      // 3.5x brings the real separation to ~110px, comfortably wider than a
+      // chip, so both are fully readable once spiderfied.
+      spiderfyDistanceMultiplier={3.5}
     >
       {flats.map((flat) => (
         <Marker

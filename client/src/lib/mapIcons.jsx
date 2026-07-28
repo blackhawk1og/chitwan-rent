@@ -356,19 +356,29 @@ const CHIP_SIZE_STYLES = {
   tight: { padY: 3, padX: 6, gap: 4, fontSize: 9, dividerH: 8, anchorX: 36, anchorY: 9 },
 };
 
+// Small red pill stacked above a reported flat's chip — see createFlatInfoChipIcon.
+const REPORT_BADGE_HEIGHT_PX = 20;
+const REPORT_BADGE_GAP_PX = 4;
+
 // Compact info chip for an individual flat pin: "3BHK · 29.2K · ★ 4.0" in one row.
-export function createFlatInfoChipIcon({ bhk, rent, rating, gated, sizeTier = "base" }) {
+// When reportCount > 0, a small red "N report(s)" pill stacks directly above
+// the chip — baked into the same divIcon (rather than a second Marker) so it
+// always moves/z-orders together with the chip it belongs to. The extra
+// height only shifts iconAnchor, not the chip's own layout, so the chip
+// itself is pixel-identical to the no-reports case.
+export function createFlatInfoChipIcon({ bhk, rent, rating, gated, sizeTier = "base", reportCount = 0 }) {
   const bhkLabel = bhk >= 5 ? "5+" : bhk;
   const priceLabel = `${(rent / 1000).toFixed(1)}K`;
   const ratingLabel = rating != null ? Number(rating).toFixed(1) : "—";
   const background = GATED_CHIP_BG[gated] ?? "rgba(17,18,32,0.96)";
   const s = CHIP_SIZE_STYLES[sizeTier] ?? CHIP_SIZE_STYLES.base;
+  const hasReports = reportCount > 0;
 
   const divider = (
     <span style={{ width: 1, height: s.dividerH, background: "rgba(255,255,255,0.18)", flexShrink: 0 }} />
   );
 
-  const html = renderToStaticMarkup(
+  const chip = (
     <div
       style={{
         display: "flex",
@@ -391,11 +401,37 @@ export function createFlatInfoChipIcon({ bhk, rent, rating, gated, sizeTier = "b
     </div>
   );
 
+  const html = renderToStaticMarkup(
+    hasReports ? (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: REPORT_BADGE_GAP_PX }}>
+        <span
+          style={{
+            fontSize: Math.max(s.fontSize - 0.5, 8),
+            fontWeight: 800,
+            color: "#ffffff",
+            background: "#dc2626",
+            padding: "2px 8px",
+            borderRadius: 9999,
+            border: "1px solid rgba(255,255,255,0.25)",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.5)",
+            whiteSpace: "nowrap",
+            fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+          }}
+        >
+          {reportCount} report{reportCount === 1 ? "" : "s"}
+        </span>
+        {chip}
+      </div>
+    ) : (
+      chip
+    )
+  );
+
   return L.divIcon({
     html,
     className: "chitwan-pin-icon",
     iconSize: null,
-    iconAnchor: [s.anchorX, s.anchorY],
+    iconAnchor: [s.anchorX, hasReports ? s.anchorY + REPORT_BADGE_HEIGHT_PX + REPORT_BADGE_GAP_PX : s.anchorY],
   });
 }
 

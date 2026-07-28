@@ -1,4 +1,5 @@
 -- Chitwan Rent — core schema (Phase 0)
+DROP TABLE IF EXISTS flat_reports CASCADE;
 DROP TABLE IF EXISTS flat_comments CASCADE;
 DROP TABLE IF EXISTS flat_ratings CASCADE;
 DROP TABLE IF EXISTS flat_interests CASCADE;
@@ -48,7 +49,8 @@ CREATE TABLE flats (
   food_pref TEXT, -- 'veg'|'non_veg'|'any' — only set when listing_type = 'flatmate'
   smoker_ok TEXT, -- 'smoker'|'non_smoker' — only set when listing_type = 'flatmate'
   posted_at TIMESTAMP DEFAULT now(),
-  is_seed BOOLEAN NOT NULL DEFAULT false -- true only for seed.js's dummy listings, never set by the real POST /api/flats submission flow
+  is_seed BOOLEAN NOT NULL DEFAULT false, -- true only for seed.js's dummy listings, never set by the real POST /api/flats submission flow
+  report_count INT NOT NULL DEFAULT 0 -- materialized from flat_reports, same pattern as rating
 );
 
 CREATE INDEX idx_flats_status ON flats(status);
@@ -77,6 +79,17 @@ CREATE TABLE flat_comments (
 );
 
 CREATE INDEX idx_flat_comments_flat_id ON flat_comments(flat_id);
+
+-- Report-listing submissions from the flat detail panel's flag button.
+CREATE TABLE flat_reports (
+  id SERIAL PRIMARY KEY,
+  flat_id INT REFERENCES flats(id) ON DELETE CASCADE,
+  user_id INT REFERENCES users(id),
+  reason TEXT,
+  created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE INDEX idx_flat_reports_flat_id ON flat_reports(flat_id);
 
 -- "I'm interested in this flat" CTA submissions.
 CREATE TABLE flat_interests (
