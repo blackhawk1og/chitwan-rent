@@ -62,11 +62,10 @@ export const CATEGORY_TIER = {
 // Schools/colleges moved off blue too, onto purple, so the map has zero blue
 // pins left while still keeping education pins on the map.
 export const POI_COLOR = {
-  orange: "#FF9800", // food & drink
+  orange: "#FF9800", // food & drink, temples/religious sites
   red: "#EA4335", // medical
   purple: "#9C27B0", // education (schools/colleges) — previously "entertainment, arts, lodging" before hotel was removed
   green: "#0F9D58", // parks, nature, outdoor recreation
-  gray: "#9E9E9E", // temples/religious sites — no dedicated Google hue for these, so a neutral tone is used consistently instead of reusing purple's color
 };
 
 export function poiTierForZoom(zoom) {

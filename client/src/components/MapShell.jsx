@@ -45,6 +45,7 @@ import GeneralPoisLayer, { GENERAL_POI_CATEGORIES } from "./GeneralPoisLayer.jsx
 import PlaceLabelsLayer from "./PlaceLabelsLayer.jsx";
 import ListingChip from "./ListingChip.jsx";
 import FlatDetailPanel from "./FlatDetailPanel.jsx";
+import NearbyFlatsModal from "./NearbyFlatsModal.jsx";
 import SeekerDetailCard from "./SeekerDetailCard.jsx";
 import MapZoomGuard from "./MapZoomGuard.jsx";
 import PinDropBanner from "./PinDropBanner.jsx";
@@ -112,7 +113,7 @@ export default function MapShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const mapRef = useRef(null);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, login } = useAuth();
 
   // Generic auth gate for actions that aren't tied to a route (Spot a To-Let).
   // Route-based flows (List My Flat / Find a Flat) gate via usePinDropFlow instead.
@@ -160,6 +161,7 @@ export default function MapShell() {
 
   const [selectedItem, setSelectedItem] = useState(null); // { type: 'flat'|'seeker', data } | null
   const [expandedItem, setExpandedItem] = useState(null); // same shape, drives the full detail card
+  const [nearbyFlatsPopup, setNearbyFlatsPopup] = useState(null); // flat[] | null — see NearbyFlatsModal
 
   const [justSubmittedFlats, setJustSubmittedFlats] = useState([]);
   const [justSubmittedToletSpots, setJustSubmittedToletSpots] = useState([]);
@@ -167,6 +169,10 @@ export default function MapShell() {
   const createSeekerPin = useCreateSeekerPin();
   const createToletSpot = useCreateToletSpot();
   const createRentReport = useCreateRentReport();
+  // Covers the full submit span (inline login + create), not just
+  // createSeekerPin's own mutation state — see handleSubmitSeekerForm.
+  const [findFlatSubmitting, setFindFlatSubmitting] = useState(false);
+  const [findFlatSubmitError, setFindFlatSubmitError] = useState(false);
 
   // Empty-map-tap quick action chooser: { step: 'chooser' | 'rent-report', lat, lng } | null
   const [quickAction, setQuickAction] = useState(null);
@@ -199,13 +205,11 @@ export default function MapShell() {
     routePath: "/list-my-flat",
     onboardingKey: "list-my-flat",
     areas,
-    isAuthenticated,
   });
   const findFlatFlow = usePinDropFlow({
     routePath: "/find-a-flat",
     onboardingKey: "find-a-flat",
     areas,
-    isAuthenticated,
   });
 
   // List My Flat continues past usePinDropFlow's own "form" step into three
@@ -218,6 +222,10 @@ export default function MapShell() {
   const [listFlatBranch, setListFlatBranch] = useState(null); // 'flat' | 'flatmate'
   const [listFlatStep0Data, setListFlatStep0Data] = useState(null); // AddFlatForm's submitted fields
   const [listFlatCreatedFlat, setListFlatCreatedFlat] = useState(null); // API response, used by the success step
+  // Covers the full submit span (inline login + create), not just createFlat's
+  // own mutation state — see handleSubmitListFlatDetails.
+  const [listFlatSubmitting, setListFlatSubmitting] = useState(false);
+  const [listFlatSubmitError, setListFlatSubmitError] = useState(false);
 
   // "Your Pin" marker replacing the plain draggable dot once Step 0 is
   // submitted — recomputed only when the underlying bhk/rent change.
@@ -437,11 +445,20 @@ export default function MapShell() {
     navigate("/");
   };
 
+  // Identity is collected right here, as part of this form, rather than via
+  // an upfront auth gate — login() is called inline with the submitted
+  // email/phone (find-or-create, same dummy auth as everywhere else) so the
+  // token is ready before createFlat's requireAuth'd POST fires. Both steps
+  // are covered by listFlatSubmitting/listFlatSubmitError since createFlat's
+  // own isPending/isError only spans the second half.
   const handleSubmitListFlatDetails = async (detailsForm) => {
     if (!listFlatFlow.draftPin || !listFlatStep0Data || !listFlatBranch) return;
     const step0 = listFlatStep0Data;
     const isFlatmate = listFlatBranch === "flatmate";
+    setListFlatSubmitting(true);
+    setListFlatSubmitError(false);
     try {
+      await login({ email: detailsForm.email, phone: detailsForm.phone });
       const created = await createFlat.mutateAsync({
         listing_type: listFlatBranch,
         bhk: step0.bhk,
@@ -473,7 +490,9 @@ export default function MapShell() {
       setListFlatCreatedFlat(created);
       setListFlatPostStep("success");
     } catch {
-      // error surfaced via createFlat.isError in the form
+      setListFlatSubmitError(true);
+    } finally {
+      setListFlatSubmitting(false);
     }
   };
 
@@ -488,9 +507,13 @@ export default function MapShell() {
     navigate("/");
   };
 
+  // Same inline-login pattern as handleSubmitListFlatDetails above.
   const handleSubmitSeekerForm = async (form) => {
     if (!findFlatFlow.draftPin) return;
+    setFindFlatSubmitting(true);
+    setFindFlatSubmitError(false);
     try {
+      await login({ email: form.email, phone: form.phone });
       const created = await createSeekerPin.mutateAsync({
         looking_for: form.lookingFor,
         budget: Number(form.budget),
@@ -512,7 +535,9 @@ export default function MapShell() {
       findFlatFlow.finish();
       navigate("/");
     } catch {
-      // error surfaced via createSeekerPin.isError in the form
+      setFindFlatSubmitError(true);
+    } finally {
+      setFindFlatSubmitting(false);
     }
   };
 
@@ -658,6 +683,12 @@ export default function MapShell() {
         zoom={DEFAULT_ZOOM}
         zoomControl={false}
         className="absolute inset-0 z-0"
+        // Leaflet's default zoomAnimationThreshold is 4 — any zoom-in larger
+        // than that (e.g. clicking a cluster from zoom 13 straight to max
+        // zoom 18) skips the smooth animated zoom entirely and just snaps to
+        // the new view instantly. Raised well past this app's full min-to-max
+        // zoom span (~12 to 18) so every zoom-in, however large, animates.
+        zoomAnimationThreshold={10}
       >
         <MapZoomGuard />
         {satelliteOn ? (
@@ -677,7 +708,11 @@ export default function MapShell() {
 
         {!pinsHidden && (
           <>
-            <FlatsLayer flats={displayedFlats} onSelect={(flat) => setExpandedItem({ type: "flat", data: flat })} />
+            <FlatsLayer
+              flats={displayedFlats}
+              onSelect={(flat) => setExpandedItem({ type: "flat", data: flat })}
+              onNearbyCluster={setNearbyFlatsPopup}
+            />
             <ToletSpotsLayer spots={displayedToletSpots} />
             {schoolsOn && <PoisLayer pois={schoolPois} />}
             <GeneralPoisLayer pois={generalPois} />
@@ -823,10 +858,6 @@ export default function MapShell() {
         />
       )}
 
-      {listFlatFlow.step === "auth" && (
-        <AuthGateModal onSuccess={listFlatFlow.proceedAfterAuth} onCancel={closeRouteModal} />
-      )}
-
       {listFlatFlow.step === "onboarding" && (
         <OnboardingModal
           onClose={closeRouteModal}
@@ -866,17 +897,13 @@ export default function MapShell() {
           onBack={handleBackToListFlatBranch}
           onClose={handleCancelListFlatPostSteps}
           onSubmit={handleSubmitListFlatDetails}
-          submitting={createFlat.isPending}
-          submitError={createFlat.isError ? "Something went wrong — please try again." : null}
+          submitting={listFlatSubmitting}
+          submitError={listFlatSubmitError ? "Something went wrong — please try again." : null}
         />
       )}
 
       {listFlatPostStep === "success" && listFlatCreatedFlat && (
         <ListFlatSuccessModal flat={listFlatCreatedFlat} onClose={handleCloseListFlatSuccess} />
-      )}
-
-      {findFlatFlow.step === "auth" && (
-        <AuthGateModal onSuccess={findFlatFlow.proceedAfterAuth} onCancel={closeRouteModal} />
       )}
 
       {findFlatFlow.step === "onboarding" && (
@@ -896,8 +923,8 @@ export default function MapShell() {
           lng={findFlatFlow.draftPin.lng}
           onCancel={findFlatFlow.cancelForm}
           onSubmit={handleSubmitSeekerForm}
-          submitting={createSeekerPin.isPending}
-          submitError={createSeekerPin.isError ? "Something went wrong — please try again." : null}
+          submitting={findFlatSubmitting}
+          submitError={findFlatSubmitError ? "Something went wrong — please try again." : null}
         />
       )}
 
@@ -1054,6 +1081,17 @@ export default function MapShell() {
 
       {expandedItem?.type === "seeker" && (
         <SeekerDetailCard seeker={expandedItem.data} onClose={() => setExpandedItem(null)} />
+      )}
+
+      {nearbyFlatsPopup && (
+        <NearbyFlatsModal
+          flats={nearbyFlatsPopup}
+          onSelectFlat={(flat) => {
+            setNearbyFlatsPopup(null);
+            setExpandedItem({ type: "flat", data: flat });
+          }}
+          onClose={() => setNearbyFlatsPopup(null)}
+        />
       )}
 
       {flatsLoading && (

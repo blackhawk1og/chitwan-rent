@@ -1,17 +1,21 @@
 import { useState } from "react";
 import Modal from "./Modal.jsx";
 import TextField from "./ui/TextField.jsx";
+import { isValidEmail, isValidPhone, sanitizePhoneInput } from "../lib/validation.js";
 
 export default function InterestForm({ onCancel, onSubmit, submitting, submitError }) {
   const [name, setName] = useState("");
-  const [contact, setContact] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
 
-  const isValid = name.trim() !== "" && contact.trim() !== "";
+  const emailError = email !== "" && !isValidEmail(email) ? "Enter a valid email address" : null;
+  const phoneError = phone !== "" && !isValidPhone(phone) ? "Enter a valid 10-digit mobile number" : null;
+  const isValid = name.trim() !== "" && isValidEmail(email) && isValidPhone(phone);
 
   const handleSubmit = () => {
     if (!isValid || submitting) return;
-    onSubmit({ name: name.trim(), contact: contact.trim(), note: note.trim() || null });
+    onSubmit({ name: name.trim(), email: email.trim(), phone, note: note.trim() || null });
   };
 
   return (
@@ -29,10 +33,21 @@ export default function InterestForm({ onCancel, onSubmit, submitting, submitErr
           onChange={(e) => setName(e.target.value)}
         />
         <TextField
-          label="Phone or email *"
-          placeholder="98XXXXXXXX or you@example.com"
-          value={contact}
-          onChange={(e) => setContact(e.target.value)}
+          label="Email *"
+          type="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={emailError}
+        />
+        <TextField
+          label="Phone *"
+          type="tel"
+          inputMode="numeric"
+          placeholder="98XXXXXXXX"
+          value={phone}
+          onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
+          error={phoneError}
         />
         <div>
           <label className="mb-1.5 block text-sm font-semibold text-text-primary">One-line note (optional)</label>

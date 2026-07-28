@@ -30,11 +30,19 @@ export function createDotIcon(IconComponent, { bg = "#7c3aed", size = 28 } = {})
 }
 
 // Two-line cluster badge: bold count on top, smaller muted subtext below.
+// "light" (the flat-count badge) renders as a dark, semi-transparent glass
+// card — matches the map's own night theme instead of sitting on top of it
+// as a bright white sticker. "teal" (the seeker-count badge) already reads
+// as part of the map and keeps its original solid-color styling untouched.
 export function createClusterBadgeIcon({ line1, line2, tone = "light" }) {
   const isLight = tone === "light";
-  const bg = isLight ? "rgba(255,255,255,0.97)" : "rgba(20,184,166,0.97)";
-  const line1Color = isLight ? "#111827" : "#ffffff";
-  const line2Color = isLight ? "#6b7280" : "rgba(255,255,255,0.85)";
+  const bg = isLight ? "rgba(21,22,38,0.92)" : "rgba(20,184,166,0.97)";
+  const line1Color = isLight ? "#f5f5f7" : "#ffffff";
+  const line2Color = isLight ? "#9ca3af" : "rgba(255,255,255,0.85)";
+  const border = isLight ? "1px solid rgba(255,255,255,0.14)" : "1px solid rgba(0,0,0,0.06)";
+  const boxShadow = isLight
+    ? "0 4px 14px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03)"
+    : "0 4px 14px rgba(0,0,0,0.45)";
 
   const html = renderToStaticMarkup(
     <div
@@ -47,8 +55,8 @@ export function createClusterBadgeIcon({ line1, line2, tone = "light" }) {
         padding: "6px 12px",
         borderRadius: 16,
         background: bg,
-        boxShadow: "0 4px 14px rgba(0,0,0,0.45)",
-        border: "1px solid rgba(0,0,0,0.06)",
+        boxShadow,
+        border,
         fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
       }}
     >
@@ -127,9 +135,13 @@ function poiPinSvg(width, height, badgeColor, glow = false) {
 // threshold. Not to be confused with createDotIcon: that one is shared by
 // non-POI markers (seeker pins, draft pins, to-let spots) and must keep its
 // plain circular shape, so POI markers get their own dedicated pin shape here.
-export function createPoiPinIcon(IconComponent, { bg = "#38bdf8", size = 28, glow = false } = {}) {
-  const width = size;
-  const height = Math.round(size * (32 / 24));
+// `IconComponent` is a white glyph on a colored badge circle — matches
+// Google Maps' own POI pin convention (see the module comment above
+// POI_PIN_PATH). Every pin is a fixed 30x32 (not proportional to some
+// caller-supplied size) — one consistent pin size across every POI category.
+export function createPoiPinIcon(IconComponent, { bg = "#38bdf8", glow = false } = {}) {
+  const width = 30;
+  const height = 32;
 
   const html = renderToStaticMarkup(
     <div style={{ position: "relative", width, height }}>
@@ -147,7 +159,7 @@ export function createPoiPinIcon(IconComponent, { bg = "#38bdf8", size = 28, glo
           zIndex: 1,
         }}
       >
-        <IconComponent size={size * 0.38} color="#ffffff" />
+        <IconComponent size={width * 0.4} color="#ffffff" />
       </div>
     </div>
   );
@@ -164,8 +176,8 @@ export function createPoiPinIcon(IconComponent, { bg = "#38bdf8", size = 28, glo
 // Small teardrop pin + text label, baked into one marker — used for POIs
 // (schools/colleges, general POIs) once zoomed in far enough to show names.
 export function createLabeledPoiIcon(IconComponent, label, { bg = "#38bdf8", glow = false } = {}) {
-  const pinWidth = 20;
-  const pinHeight = Math.round(pinWidth * (32 / 24));
+  const pinWidth = 30;
+  const pinHeight = 32;
 
   const html = renderToStaticMarkup(
     // flex-end (not center) so the pin's tip and the label's baseline sit on
@@ -290,8 +302,8 @@ const SEARCH_PIN_COLOR = "#E91E63";
 // SearchBar.jsx, so one icon factory covers both). `label` is optional so a
 // bare pin can still be requested without a caption.
 export function createSearchResultPinIcon(label) {
-  const pinWidth = 28;
-  const pinHeight = Math.round(pinWidth * (32 / 24));
+  const pinWidth = 30;
+  const pinHeight = 32;
 
   const html = renderToStaticMarkup(
     <div style={{ display: "flex", alignItems: "flex-end", gap: 4 }}>

@@ -61,7 +61,7 @@ export default function PoisLayer({ pois }) {
           const icon =
             zoom >= labelZoomFor(p.category)
               ? createLabeledPoiIcon(MdSchool, p.name, { bg: SCHOOL_ICON_BG })
-              : createPoiPinIcon(MdSchool, { bg: SCHOOL_ICON_BG, size: 26 });
+              : createPoiPinIcon(MdSchool, { bg: SCHOOL_ICON_BG });
           return [p.id, icon];
         })
       ),

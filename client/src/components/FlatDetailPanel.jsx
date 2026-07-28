@@ -57,7 +57,7 @@ function Pill({ icon: Icon, tone = "neutral", children }) {
 }
 
 export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, login } = useAuth();
   const rateFlat = useRateFlat(flat.id);
   const flatInterest = useFlatInterest(flat.id);
   const reportFlat = useReportFlat(flat.id);
@@ -66,11 +66,17 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
   const [reported, setReported] = useState(false);
   const [sqftUnit, setSqftUnit] = useState("ft");
 
-  const [authGate, setAuthGate] = useState(null); // 'rating' | 'interest' | 'comment' | 'report' | null
+  const [authGate, setAuthGate] = useState(null); // 'rating' | 'comment' | 'report' | null — "interest" is
+  // collected inline in its own form now (email + phone, both required),
+  // not via this shared gate; see openInterest / handleSubmitInterest.
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
   const [pendingStars, setPendingStars] = useState(0);
   const [interestFormOpen, setInterestFormOpen] = useState(false);
   const [interestSent, setInterestSent] = useState(false);
+  // Covers the full submit span (inline login + interest POST), not just
+  // flatInterest's own mutation state — see handleSubmitInterest.
+  const [interestSubmitting, setInterestSubmitting] = useState(false);
+  const [interestSubmitError, setInterestSubmitError] = useState(false);
   const [localRating, setLocalRating] = useState(null);
   const displayedRating = localRating ?? flat.rating;
 
@@ -125,11 +131,9 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
     setRatingModalOpen(true);
   };
 
+  // No auth gate — identity (email + phone, both required) is collected
+  // inline inside InterestForm itself and used to log in at submit time.
   const openInterest = () => {
-    if (!isAuthenticated) {
-      setAuthGate("interest");
-      return;
-    }
     setInterestFormOpen(true);
   };
 
@@ -148,8 +152,6 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
     if (target === "rating") {
       setPendingStars(0);
       setRatingModalOpen(true);
-    } else if (target === "interest") {
-      setInterestFormOpen(true);
     } else if (target === "report") {
       reportFlat.mutate(undefined, { onSuccess: () => setReported(true) });
     }
@@ -165,13 +167,27 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
     });
   };
 
-  const handleSubmitInterest = (form) => {
-    flatInterest.mutate(form, {
-      onSuccess: () => {
-        setInterestFormOpen(false);
-        setInterestSent(true);
-      },
-    });
+  // Identity is collected right here, as part of InterestForm, rather than
+  // via an upfront auth gate — login() is called inline with the submitted
+  // email/phone (find-or-create, same dummy auth as everywhere else) so the
+  // token is ready before flatInterest's requireAuth'd POST fires.
+  const handleSubmitInterest = async (form) => {
+    setInterestSubmitting(true);
+    setInterestSubmitError(false);
+    try {
+      await login({ email: form.email, phone: form.phone });
+      await flatInterest.mutateAsync({
+        name: form.name,
+        contact: `${form.email} / ${form.phone}`,
+        note: form.note,
+      });
+      setInterestFormOpen(false);
+      setInterestSent(true);
+    } catch {
+      setInterestSubmitError(true);
+    } finally {
+      setInterestSubmitting(false);
+    }
   };
 
   return (
@@ -378,8 +394,8 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
         <InterestForm
           onCancel={() => setInterestFormOpen(false)}
           onSubmit={handleSubmitInterest}
-          submitting={flatInterest.isPending}
-          submitError={flatInterest.isError ? "Something went wrong — please try again." : null}
+          submitting={interestSubmitting}
+          submitError={interestSubmitError ? "Something went wrong — please try again." : null}
         />
       )}
 

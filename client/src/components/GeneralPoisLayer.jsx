@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Marker, useMap, useMapEvents } from "react-leaflet";
 import { MdRestaurant, MdLocalCafe, MdLocalPharmacy, MdTempleBuddhist, MdAccountBalance, MdPlace } from "react-icons/md";
+import { FaCross, FaOm } from "react-icons/fa";
 import { createLabeledPoiIcon } from "../lib/mapIcons.jsx";
 import { CATEGORY_TIER, POI_COLOR, poiTierForZoom } from "../lib/poiTiers.js";
 
@@ -17,22 +18,37 @@ function HospitalLetterIcon({ size, color }) {
 
 // Icon glyphs are Material Design icons (react-icons/md — self-hosted SVGs,
 // Apache-2.0-licensed Google icon set, no CDN/font dependency) except
-// hospital/clinic, which use the plain-"H" glyph above. Pin badge colors
-// follow Google Maps' own category convention (see POI_COLOR) rather than a
-// custom per-category palette — orange for food & drink, red for medical,
-// green for parks/landmarks, and a neutral gray for temples (no dedicated
-// Google hue exists for religious sites). Hotel/lodging, shop, fuel, and gym
-// are deliberately absent — all removed from the POI set entirely
-// (shop/fuel/gym were the only categories using Google's blue).
+// hospital/clinic, which use the plain-"H" glyph above — matches Google
+// Maps' own POI pin convention (white glyph on a colored badge circle).
+// Pin badge colors follow Google Maps' own category convention (see
+// POI_COLOR) rather than a custom per-category palette — orange for food &
+// drink, red for medical, green for parks/landmarks, and a neutral gray for
+// temples (no dedicated Google hue exists for religious sites). Hotel/
+// lodging, shop, fuel, and gym are deliberately absent — all removed from
+// the POI set entirely (shop/fuel/gym were the only categories using
+// Google's blue).
 const CATEGORY_STYLE = {
   restaurant: { Icon: MdRestaurant, bg: POI_COLOR.orange },
   cafe: { Icon: MdLocalCafe, bg: POI_COLOR.orange },
   hospital: { Icon: HospitalLetterIcon, bg: POI_COLOR.red },
   clinic: { Icon: HospitalLetterIcon, bg: POI_COLOR.red },
   pharmacy: { Icon: MdLocalPharmacy, bg: POI_COLOR.red },
-  temple: { Icon: MdTempleBuddhist, bg: POI_COLOR.gray },
+  temple: { Icon: MdTempleBuddhist, bg: POI_COLOR.orange },
   landmark: { Icon: MdAccountBalance, bg: POI_COLOR.green },
 };
+
+// "temple" is a single OSM category covering every place of worship
+// (mandirs, churches, mosques, gumbas — the raw data has no religion field
+// to split on), so within it the icon is picked from the POI's own name
+// instead of a fixed per-category glyph: a cross for churches, Om for
+// mandirs/temples, and the generic temple glyph above for anything else
+// (mosques, gumbas, ambiguous names) — left as it was.
+function templeIconFor(name) {
+  const lower = (name || "").toLowerCase();
+  if (lower.includes("church") || lower.includes("chruch")) return FaCross;
+  if (lower.includes("mandir") || lower.includes("temple") || (name || "").includes("मन्दिर")) return FaOm;
+  return MdTempleBuddhist;
+}
 
 // Derived from CATEGORY_TIER so the categories fetched from the API can
 // never drift out of sync with the ones this layer actually knows how to
@@ -121,7 +137,8 @@ export default function GeneralPoisLayer({ pois }) {
       Object.fromEntries(
         declutteredPois.map((p) => {
           const style = CATEGORY_STYLE[p.category] ?? { Icon: MdPlace, bg: "#6b7280" };
-          const icon = createLabeledPoiIcon(style.Icon, p.name, { bg: style.bg });
+          const Icon = p.category === "temple" ? templeIconFor(p.name) : style.Icon;
+          const icon = createLabeledPoiIcon(Icon, p.name, { bg: style.bg });
           return [p.id, icon];
         })
       ),

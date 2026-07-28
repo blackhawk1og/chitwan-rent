@@ -1,7 +1,12 @@
 export default function TextField({ label, prefix, suffix, helper, error, ...inputProps }) {
+  const isRequired = typeof label === "string" && label.endsWith(" *");
+  const labelText = isRequired ? label.slice(0, -2) : label;
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-semibold text-text-primary">{label}</label>
+      <label className="mb-1.5 block text-sm font-semibold text-text-primary">
+        {labelText}
+        {isRequired && <span className="text-red-400"> *</span>}
+      </label>
       <div
         className={`flex items-center gap-1.5 rounded-xl border bg-surface-alt px-3 py-2.5 ${
           error ? "border-red-500/50" : "border-white/10"

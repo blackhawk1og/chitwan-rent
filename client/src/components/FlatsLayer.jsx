@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Marker, useMap, useMapEvents } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import { createFlatInfoChipIcon, createClusterBadgeIcon } from "../lib/mapIcons.jsx";
+import { createClusterClickHandler } from "../lib/clusterBehavior.js";
 
 // Zoom thresholds for progressively shrinking the flat info chip as the user
 // zooms in further — named/centralized here so they're easy to retune after
@@ -17,15 +18,41 @@ function chipSizeTier(zoom) {
   return "base";
 }
 
-export default function FlatsLayer({ flats, onSelect }) {
+export default function FlatsLayer({ flats, onSelect, onNearbyCluster }) {
   const map = useMap();
   const [zoom, setZoom] = useState(map.getZoom());
+  const clusterRef = useRef(null);
 
   useMapEvents({
     zoomend() {
       setZoom(map.getZoom());
     },
   });
+
+  // Flats at (near-)identical coordinates can never be split apart by
+  // zooming further, so their cluster shows NearbyFlatsModal (via
+  // onNearbyCluster) instead of spiderfying — see clusterBehavior.js.
+  // Genuinely splittable clusters still zoom in smoothly on click, same as
+  // the library's own default behavior otherwise would.
+  useEffect(() => {
+    const group = clusterRef.current;
+    if (!group) return;
+
+    const handleClusterClick = createClusterClickHandler({
+      onNeverSplitCluster: (markers) => {
+        const clusterFlats = markers.map((m) => m.__flatData).filter(Boolean);
+        if (clusterFlats.length) onNearbyCluster(clusterFlats);
+      },
+    });
+
+    group.off("clusterclick clusterkeypress", group._zoomOrSpiderfy, group);
+    group.on("clusterclick clusterkeypress", handleClusterClick, group);
+
+    return () => {
+      group.off("clusterclick clusterkeypress", handleClusterClick, group);
+      group.on("clusterclick clusterkeypress", group._zoomOrSpiderfy, group);
+    };
+  }, [onNearbyCluster]);
 
   const sizeTier = chipSizeTier(zoom);
 
@@ -61,20 +88,11 @@ export default function FlatsLayer({ flats, onSelect }) {
 
   return (
     <MarkerClusterGroup
+      ref={clusterRef}
       iconCreateFunction={iconCreateFunction}
       maxClusterRadius={60}
       spiderfyOnMaxZoom
       showCoverageOnHover={false}
-      // Two flats can sit at (near-)identical coordinates — zooming further
-      // can never split that pair apart, so at max zoom Leaflet.markercluster
-      // "spiderfies" them (fans them out from the cluster's own default
-      // circle-layout spacing) instead. That default spacing (25px foot
-      // separation for a 2-member circle, ~32px apart center-to-center) was
-      // tuned for small round pin icons, not our ~90px-wide flat info chips —
-      // undersized, the two chips ended up rendering on top of each other.
-      // 3.5x brings the real separation to ~110px, comfortably wider than a
-      // chip, so both are fully readable once spiderfied.
-      spiderfyDistanceMultiplier={3.5}
     >
       {flats.map((flat) => (
         <Marker
@@ -82,6 +100,13 @@ export default function FlatsLayer({ flats, onSelect }) {
           position={[flat.lat, flat.lng]}
           icon={icons[flat.id]}
           eventHandlers={{ click: () => onSelect(flat) }}
+          // Stashed directly on the marker instance so the generic cluster
+          // click handler (clusterBehavior.js) can read back which flat
+          // each spiderfied-alternative marker belongs to, without that
+          // shared/data-agnostic module needing to know about flats.
+          ref={(marker) => {
+            if (marker) marker.__flatData = flat;
+          }}
         />
       ))}
     </MarkerClusterGroup>
