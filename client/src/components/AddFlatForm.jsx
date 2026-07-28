@@ -33,6 +33,7 @@ const initialForm = {
   petsAllowed: null,
   parkingFor: "",
   sqft: "",
+  societyName: "",
   email: "",
   oneLiner: "",
 };
@@ -49,6 +50,7 @@ export default function AddFlatForm({ onCancel, onSubmit, submitting, submitErro
     form.furnishing !== null &&
     form.gated !== null &&
     form.parkingFor !== "" &&
+    form.societyName !== "" &&
     !emailError;
 
   const handleSubmit = () => {
@@ -183,6 +185,15 @@ export default function AddFlatForm({ onCancel, onSubmit, submitting, submitErro
             placeholder="e.g. 650"
             value={form.sqft}
             onChange={(e) => set({ sqft: e.target.value })}
+          />
+
+          <TextField
+            label="Society / Building Name *"
+            type="text"
+            placeholder="e.g. Sobha Dream Acres"
+            value={form.societyName}
+            onChange={(e) => set({ societyName: e.target.value })}
+            helper="This helps others know where to look when they're interested"
           />
 
           <TextField

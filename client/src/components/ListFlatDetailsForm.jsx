@@ -15,7 +15,6 @@ const AVAILABLE_FROM_OPTIONS = [
 
 const initialForm = {
   availableFrom: "asap",
-  parkingFor: "",
   flatmateGenderPref: null,
   foodPref: null,
   smokerOk: null,
@@ -44,7 +43,6 @@ export default function ListFlatDetailsForm({
   const phoneError = form.phone !== "" && !isValidPhone(form.phone) ? "Enter a valid 10-digit mobile number" : null;
   const isValid =
     form.availableFrom !== null &&
-    form.parkingFor !== "" &&
     isValidEmail(form.email) &&
     isValidPhone(form.phone);
 
@@ -81,17 +79,6 @@ export default function ListFlatDetailsForm({
             ))}
           </div>
         </div>
-
-        <TextField
-          label="🚗 Parking for *"
-          suffix="cars"
-          type="number"
-          min="0"
-          placeholder="0"
-          value={form.parkingFor}
-          onChange={(e) => set({ parkingFor: e.target.value })}
-          helper="Enter 0 if there's no parking."
-        />
 
         {isFlatmate && (
           <>

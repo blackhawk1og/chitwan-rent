@@ -13,7 +13,9 @@
     "seed:pois": "node db/seed-pois.js",
     "seed:general-pois": "node db/seed-general-pois.js",
     "add:places-table": "node db/add-places-table.js",
-    "seed:places": "node db/seed-places.js"
+    "seed:places": "node db/seed-places.js",
+    "add:flats-society-name": "node db/add-flats-society-name.js",
+    "add:flats-is-seed": "node db/add-flats-is-seed.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

@@ -42,6 +42,7 @@ import ToletSpotsLayer from "./ToletSpotsLayer.jsx";
 import BusRoutesLayer from "./BusRoutesLayer.jsx";
 import PoisLayer from "./PoisLayer.jsx";
 import GeneralPoisLayer, { GENERAL_POI_CATEGORIES } from "./GeneralPoisLayer.jsx";
+import PlaceLabelsLayer from "./PlaceLabelsLayer.jsx";
 import ListingChip from "./ListingChip.jsx";
 import FlatDetailPanel from "./FlatDetailPanel.jsx";
 import SeekerDetailCard from "./SeekerDetailCard.jsx";
@@ -451,9 +452,10 @@ export default function MapShell() {
         gated: step0.gated,
         who_lives: step0.whoLives,
         pets_allowed: step0.petsAllowed,
-        // Step 2 re-asks parking/email — its values win over Step 0's.
-        parking_for: Number(detailsForm.parkingFor),
+        // Parking is only asked once, in Step 0 — Step 2 no longer re-asks it.
+        parking_for: Number(step0.parkingFor),
         sqft: step0.sqft === "" ? null : Number(step0.sqft),
+        society_name: step0.societyName || null,
         one_liner: step0.oneLiner || null,
         email: detailsForm.email || null,
         phone: detailsForm.phone || null,
@@ -666,6 +668,12 @@ export default function MapShell() {
             <TileLayer key="dark-labels" url={DARK_LABEL_TILE_URL} className="chitwan-label-tile" />
           </>
         )}
+
+        <PlaceLabelsLayer
+          places={places}
+          flats={pinsHidden ? [] : displayedFlats}
+          pois={pinsHidden ? [] : [...schoolPois, ...generalPois]}
+        />
 
         {!pinsHidden && (
           <>
@@ -1034,7 +1042,14 @@ export default function MapShell() {
       )}
 
       {expandedItem?.type === "flat" && (
-        <FlatDetailPanel flat={expandedItem.data} onClose={() => setExpandedItem(null)} />
+        <FlatDetailPanel
+          flat={expandedItem.data}
+          onClose={() => setExpandedItem(null)}
+          onSeeAvailable={() => {
+            setExpandedItem(null);
+            handleAvlbFlatsClick();
+          }}
+        />
       )}
 
       {expandedItem?.type === "seeker" && (

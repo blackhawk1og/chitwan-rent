@@ -43,6 +43,15 @@ body {
   cursor: pointer;
 }
 
+/* Place-name labels (PlaceLabelsLayer) are inert map context, not a
+   clickable marker — no pointer cursor, and no hit-testing at the wrapper
+   level either (belt-and-braces alongside the inline pointer-events:none on
+   the label text itself in createPlaceLabelIcon). */
+.chitwan-place-label {
+  cursor: default;
+  pointer-events: none;
+}
+
 /* CARTO's dark-matter label tiles render road/place names at fairly low
    contrast by default. Boosting brightness/contrast on just this overlay
    (road/water/fill colors live on a separate base tile layer underneath)

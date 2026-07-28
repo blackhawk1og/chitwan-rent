@@ -1,9 +1,13 @@
 import { queryOverpass, dedupePois, CHITWAN_BBOX } from "./poisData.js";
 
 // The search bar's local typeahead gazetteer — general locality names
-// (villages, towns, suburbs, neighbourhoods, hamlets), separate from the
-// `pois` table's specific named venues (schools, hospitals, restaurants...).
-const PLACE_TYPES = ["village", "town", "suburb", "neighbourhood", "hamlet"];
+// (cities, towns, villages, suburbs, neighbourhoods, hamlets), separate from
+// the `pois` table's specific named venues (schools, hospitals, restaurants...).
+// 'city' was missing originally — Bharatpur, Chitwan's district headquarters
+// and largest urban area, is tagged place=city in OSM (not 'town'), so it
+// was never fetched at all, leaving it the one place in the district with no
+// English label of our own to show over CARTO's Devanagari basemap text.
+const PLACE_TYPES = ["city", "town", "village", "suburb", "neighbourhood", "hamlet"];
 
 // Pulls every real place OSM has tagged inside the Chitwan bbox via the
 // public Overpass API. Same bbox, `way`->`out center` resolution, and dedup

@@ -218,6 +218,59 @@ export function createLabeledPoiIcon(IconComponent, label, { bg = "#38bdf8", glo
   });
 }
 
+// Plain text label for a locality name (village/town/suburb/neighbourhood/
+// hamlet) — no icon glyph, no pin shape, just a name floating directly over
+// its point, the way Google Maps prints place names with no marker attached.
+// Built on the same zero-size anchor-box trick as createYourPinIcon below,
+// generalized to center on both axes (translate -50%/-50%) rather than sit
+// above a fixed point, since a bare label centers ON its coordinate instead
+// of anchoring from an edge.
+// pointer-events:none here is load-bearing, not decorative — this layer
+// renders as regular markers stacked with everything else on the map, and a
+// label must never steal a tap meant for the map background underneath it
+// (PinDropCatcher/EmptyTapCatcher) or a flat chip it happens to overlap.
+//
+// A frosted-glass backdrop-blur pill briefly replaced this bare-text
+// treatment, then got reverted — backdrop-filter has to keep re-sampling
+// whatever's underneath it on every frame, and Leaflet transforms markers
+// continuously during its zoom animation, so the two together made zoom
+// transitions visibly smear/lag. Bare text with a strong multi-directional
+// shadow "outline" has no such cost (text-shadow is cheap, no live
+// background sampling) and still reads clearly over the dark/satellite
+// tiles, road lines, and CARTO's own label overlay underneath.
+export function createPlaceLabelIcon(name) {
+  const html = renderToStaticMarkup(
+    <div style={{ position: "relative", width: 0, height: 0 }}>
+      <span
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          transform: "translate(-50%, -50%)",
+          whiteSpace: "nowrap",
+          pointerEvents: "none",
+          fontSize: 12,
+          fontWeight: 700,
+          letterSpacing: 0.2,
+          color: "#ffffff",
+          fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+          textShadow:
+            "-1.5px -1.5px 2.5px rgba(0,0,0,0.9), 1.5px -1.5px 2.5px rgba(0,0,0,0.9), -1.5px 1.5px 2.5px rgba(0,0,0,0.9), 1.5px 1.5px 2.5px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.75)",
+        }}
+      >
+        {name}
+      </span>
+    </div>
+  );
+
+  return L.divIcon({
+    html,
+    className: "chitwan-place-label",
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+  });
+}
+
 // Solid-fill teardrop with a small white "punch-hole" near the top — the
 // classic Google Maps search-result pin silhouette, deliberately different
 // from the POI pins above (white body + small colored badge) so a picked

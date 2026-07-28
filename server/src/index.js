@@ -16,7 +16,18 @@ import rentReportsRouter from "./routes/rentReports.js";
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || "http://localhost:5173" }));
+// In dev, Vite falls back to a different port than 5173 whenever that one's
+// still occupied (e.g. by a not-yet-released socket from a just-restarted
+// server) — a single hardcoded origin breaks the instant that happens, since
+// every request gets CORS-blocked even though the API server is responding
+// fine. Any http://localhost:<port> origin is trusted when CLIENT_ORIGIN
+// isn't set; CLIENT_ORIGIN (for a real deployment) still locks this down to
+// one exact origin, unchanged from before.
+const corsOrigin = process.env.CLIENT_ORIGIN
+  ? process.env.CLIENT_ORIGIN
+  : (origin, callback) => callback(null, !origin || /^http:\/\/localhost:\d+$/.test(origin));
+
+app.use(cors({ origin: corsOrigin }));
 // Raised from Express's 100kb default — to-let board photos travel as base64 JSON.
 app.use(express.json({ limit: "10mb" }));
 

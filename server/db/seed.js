@@ -155,8 +155,8 @@ async function seedFlats(users, count = 180) {
       `INSERT INTO flats
         (owner_id, listing_type, bhk, rent, deposit, furnishing, includes_maintenance,
          gated, who_lives, pets_allowed, parking_for, sqft, rating, one_liner, status,
-         lat, lng, area, photos, posted_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
+         lat, lng, area, photos, posted_at, is_seed)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,true)`,
       r
     );
   }

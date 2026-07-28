@@ -111,7 +111,7 @@ function randomRating() {
 router.post("/", requireAuth, async (req, res) => {
   const {
     listing_type, bhk, rent, deposit, furnishing, includes_maintenance,
-    gated, who_lives, pets_allowed, parking_for, sqft, one_liner, lat, lng, area, photos, email, phone,
+    gated, who_lives, pets_allowed, parking_for, sqft, one_liner, lat, lng, area, society_name, photos, email, phone,
     available_from, flatmate_gender_pref, food_pref, smoker_ok,
   } = req.body;
 
@@ -135,14 +135,14 @@ router.post("/", requireAuth, async (req, res) => {
     const result = await query(
       `INSERT INTO flats
         (owner_id, listing_type, bhk, rent, deposit, furnishing, includes_maintenance,
-         gated, who_lives, pets_allowed, parking_for, sqft, rating, one_liner, status, lat, lng, area, photos,
+         gated, who_lives, pets_allowed, parking_for, sqft, rating, one_liner, status, lat, lng, area, society_name, photos,
          available_from, flatmate_gender_pref, food_pref, smoker_ok)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'pending_review',$15,$16,$17,$18,$19,$20,$21,$22)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'pending_review',$15,$16,$17,$18,$19,$20,$21,$22,$23)
        RETURNING *`,
       [
         req.userId, listing_type ?? "flat", bhk, rent, deposit ?? null, furnishing,
         includes_maintenance ?? false, gated, who_lives ?? null, pets_allowed ?? null,
-        parking_for ?? 0, sqft ?? null, randomRating(), one_liner ?? null, lat, lng, area ?? null, photos ?? [],
+        parking_for ?? 0, sqft ?? null, randomRating(), one_liner ?? null, lat, lng, area ?? null, society_name ?? null, photos ?? [],
         available_from ?? null, flatmate_gender_pref ?? null, food_pref ?? null, smoker_ok ?? null,
       ]
     );

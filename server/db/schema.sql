@@ -41,12 +41,14 @@ CREATE TABLE flats (
   lat DOUBLE PRECISION,
   lng DOUBLE PRECISION,
   area TEXT, -- ward/tole name, reverse-geocoded
+  society_name TEXT, -- owner-entered building/society name, distinct from area
   photos TEXT[],
   available_from TEXT CHECK (available_from IN ('asap','next_month','flexible')),
   flatmate_gender_pref TEXT, -- 'male'|'female'|'any' — only set when listing_type = 'flatmate'
   food_pref TEXT, -- 'veg'|'non_veg'|'any' — only set when listing_type = 'flatmate'
   smoker_ok TEXT, -- 'smoker'|'non_smoker' — only set when listing_type = 'flatmate'
-  posted_at TIMESTAMP DEFAULT now()
+  posted_at TIMESTAMP DEFAULT now(),
+  is_seed BOOLEAN NOT NULL DEFAULT false -- true only for seed.js's dummy listings, never set by the real POST /api/flats submission flow
 );
 
 CREATE INDEX idx_flats_status ON flats(status);

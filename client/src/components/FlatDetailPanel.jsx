@@ -13,6 +13,7 @@ import {
   Maximize2,
   Clock,
   Map as MapIcon,
+  MapPin,
   ArrowRight,
   ChevronRight,
 } from "lucide-react";
@@ -54,7 +55,7 @@ function Pill({ icon: Icon, tone = "neutral", children }) {
   );
 }
 
-export default function FlatDetailPanel({ flat, onClose }) {
+export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
   const { isAuthenticated } = useAuth();
   const rateFlat = useRateFlat(flat.id);
   const flatInterest = useFlatInterest(flat.id);
@@ -72,6 +73,15 @@ export default function FlatDetailPanel({ flat, onClose }) {
   const displayedRating = localRating ?? flat.rating;
 
   const bannerText = BANNER_COPY[flat.listing_type] ?? BANNER_COPY.flat;
+  // Seed listings (flats.is_seed — see server/db/seed.js and the
+  // add-flats-is-seed migration) are dummy demo data, not real availability —
+  // the pill set (bhk/furnishing/etc.) still describes the place, but the
+  // banner needs to say so instead of the normal "owner is looking to rent"
+  // copy, which would otherwise misrepresent every seed listing as real and
+  // actually rentable. Only flats created live through the real "List My
+  // Flat" submission flow (is_seed defaults to false there) get the normal
+  // banner and "I'm interested" CTA.
+  const isDummyListing = flat.is_seed;
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${flat.lat},${flat.lng}`;
   const sqftDisplay = flat.sqft
     ? sqftUnit === "ft"
@@ -196,10 +206,31 @@ export default function FlatDetailPanel({ flat, onClose }) {
         <div className="px-5 pb-8 pt-4">
           <PhotoCarousel photos={flat.photos ?? []} />
 
-          <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-accent-teal/15 px-4 py-3 text-sm font-semibold text-accent-teal">
-            <Home size={16} className="shrink-0" />
-            {bannerText}
-          </div>
+          {isDummyListing ? (
+            <div className="mt-4 rounded-xl border border-white/10 bg-surface-alt/60 p-4">
+              <div className="flex items-start gap-3">
+                <MapPin size={16} className="mt-0.5 shrink-0 text-rose-400" />
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-text-primary">Not for rent</div>
+                  <p className="mt-1 text-xs text-text-muted">
+                    This person pinned their rent for transparency — they're not renting it out.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onSeeAvailable}
+                    className="mt-2 text-xs font-semibold text-accent-teal hover:underline"
+                  >
+                    See flats currently available →
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-accent-teal/15 px-4 py-3 text-sm font-semibold text-accent-teal">
+              <Home size={16} className="shrink-0" />
+              {bannerText}
+            </div>
+          )}
 
           <div className="mt-4 flex flex-wrap gap-2">
             <Pill icon={Home} tone="purple">
@@ -221,7 +252,8 @@ export default function FlatDetailPanel({ flat, onClose }) {
           </div>
 
           <div className="mt-4 text-sm text-text-muted">
-            Society: <span className="font-semibold text-text-primary">{flat.area || "Independent"}</span>
+            Society: <span className="font-semibold text-text-primary">{flat.society_name || "Independent"}</span>
+            {flat.area && <span> · {flat.area}</span>}
           </div>
 
           {flat.one_liner && (
@@ -255,25 +287,29 @@ export default function FlatDetailPanel({ flat, onClose }) {
             </a>
           </div>
 
-          <button
-            type="button"
-            onClick={openInterest}
-            className="mt-6 flex w-full items-center gap-3 rounded-2xl border border-accent-teal/30 bg-accent-teal/10 p-4 text-left transition hover:bg-accent-teal/15"
-          >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-teal text-white">
-              <Home size={18} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-bold text-text-primary">I'm interested in this flat</div>
-              <div className="mt-0.5 text-xs text-text-muted">
-                Share your preferences — we'll email the owner with your details and also match you against other
-                nearby flats.
-              </div>
-            </div>
-            <ArrowRight size={18} className="shrink-0 text-accent-teal" />
-          </button>
-          {interestSent && (
-            <p className="mt-2 text-xs text-accent-teal">Thanks! We've noted your interest and will be in touch.</p>
+          {!isDummyListing && (
+            <>
+              <button
+                type="button"
+                onClick={openInterest}
+                className="mt-6 flex w-full items-center gap-3 rounded-2xl border border-accent-teal/30 bg-accent-teal/10 p-4 text-left transition hover:bg-accent-teal/15"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-teal text-white">
+                  <Home size={18} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-bold text-text-primary">I'm interested in this flat</div>
+                  <div className="mt-0.5 text-xs text-text-muted">
+                    Share your preferences — we'll email the owner with your details and also match you against other
+                    nearby flats.
+                  </div>
+                </div>
+                <ArrowRight size={18} className="shrink-0 text-accent-teal" />
+              </button>
+              {interestSent && (
+                <p className="mt-2 text-xs text-accent-teal">Thanks! We've noted your interest and will be in touch.</p>
+              )}
+            </>
           )}
 
           <button
