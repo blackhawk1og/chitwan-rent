@@ -701,7 +701,12 @@ export default function MapShell() {
           <TileLayer key="satellite" url={SATELLITE_TILE_URL} attribution={SATELLITE_ATTRIBUTION} />
         ) : (
           <>
-            <TileLayer key="dark-base" url={DARK_TILE_URL} attribution={DARK_TILE_ATTRIBUTION} />
+            <TileLayer
+              key="dark-base"
+              url={DARK_TILE_URL}
+              attribution={DARK_TILE_ATTRIBUTION}
+              className="chitwan-base-tile"
+            />
             <TileLayer key="dark-labels" url={DARK_LABEL_TILE_URL} className="chitwan-label-tile" />
           </>
         )}
