@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker } from "react-leaflet";
-import { Compass, KeyRound, Search, Ruler } from "lucide-react";
+import { KeyRound, Search, Ruler } from "lucide-react";
 import {
   CHITWAN_CENTER,
   DEFAULT_ZOOM,
@@ -36,6 +36,7 @@ import TopNavPill from "./TopNavPill.jsx";
 import SearchBar from "./SearchBar.jsx";
 import IconStack from "./IconStack.jsx";
 import OnboardingModal, { isOnboardingDismissed } from "./OnboardingModal.jsx";
+import HowToUseTour, { isHowToUseTourSeen } from "./HowToUseTour.jsx";
 import FilterModal from "./FilterModal.jsx";
 import FlatsLayer from "./FlatsLayer.jsx";
 import ToletSpotsLayer from "./ToletSpotsLayer.jsx";
@@ -67,13 +68,6 @@ import AreaRectangleLayer from "./AreaRectangleLayer.jsx";
 import AreaStatsResultsModal from "./AreaStatsResultsModal.jsx";
 import AuthGateModal from "./AuthGateModal.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-
-const HOW_TO_USE_STEPS = [
-  "Browse available flats and flatmate-seeker pins on the map",
-  "Search or filter by BHK, rent, neighbourhood, and more",
-  "List your flat or drop a seeker pin in a few taps",
-  "Spot a To-Let board on your walk and become a rental Superhero",
-];
 
 const LIST_MY_FLAT_STEPS = [
   "Drop a pin at your flat's location",
@@ -122,6 +116,18 @@ export default function MapShell() {
     if (isAuthenticated) action();
     else setPendingAuthAction(() => action);
   };
+
+  // First-time visitors land straight on the guided tour (see
+  // HowToUseTour.jsx) — routes there exactly like clicking the "How to use"
+  // pill would, so both paths render the exact same tour. Only fires once,
+  // on mount, and only from the default map view (a direct/bookmarked link
+  // into a specific flow, e.g. "/list-my-flat", is left alone).
+  useEffect(() => {
+    if (location.pathname === "/" && !isHowToUseTourSeen()) {
+      navigate("/how-to-use");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [searchValue, setSearchValue] = useState("");
   // The pin dropped at a picked search result — {label, lat, lng} or null.
@@ -790,6 +796,10 @@ export default function MapShell() {
         <div
           className={`pointer-events-auto w-full ${TOP_BAR_ROW_MAX_WIDTH_CLASS}`}
           style={navRowWidth ? { maxWidth: `${navRowWidth}px` } : undefined}
+          // HowToUseTour spotlights the search bar here — only meaningful
+          // in the default browsing state (topBarStatus null), which is
+          // the only state the tour is ever open in.
+          data-tour="search-bar"
         >
           {topBarStatus ? (
             <StatusBanner
@@ -815,6 +825,9 @@ export default function MapShell() {
         <div
           className={`pointer-events-auto flex w-full ${TOP_BAR_ROW_MAX_WIDTH_CLASS} justify-center`}
           style={navRowWidth ? { maxWidth: `${navRowWidth}px` } : undefined}
+          // HowToUseTour spotlights the nav pill row here — same caveat as
+          // "search-bar" above.
+          data-tour="nav-pill-row"
         >
           {topBarStatus ? (
             <SearchBar
@@ -848,15 +861,7 @@ export default function MapShell() {
         </div>
       </div>
 
-      {location.pathname === "/how-to-use" && (
-        <OnboardingModal
-          onClose={closeRouteModal}
-          icon={Compass}
-          title="Here's how it works"
-          steps={HOW_TO_USE_STEPS}
-          ctaLabel="Got it, let's go"
-        />
-      )}
+      {location.pathname === "/how-to-use" && <HowToUseTour onClose={closeRouteModal} />}
 
       {listFlatFlow.step === "onboarding" && (
         <OnboardingModal

@@ -29,11 +29,19 @@ export default function IconStack({
 }) {
   return (
     <div className="absolute right-4 top-1/2 flex -translate-y-1/2 flex-col gap-5">
-      <StackButton icon={Camera} label="Spot a To-Let" onClick={onSpotToLet} />
-      <StackButton icon={Bus} label="Bus Routes" active={busRoutesOn} onClick={onToggleBusRoutes} />
-      <StackButton icon={GraduationCap} label="Schools" active={schoolsOn} onClick={onToggleSchools} />
-      <StackButton icon={Satellite} label="Satellite" active={satelliteOn} onClick={onToggleSatellite} />
-      <StackButton icon={MoreHorizontal} label="More" onClick={onMore} />
+      {/* Each wrapper below is a HowToUseTour spotlight target (data-tour) —
+          plain wrapping divs, so the gap-5 rhythm between all five buttons
+          is reproduced exactly via the same gap-5 on the inner group,
+          rather than changed. */}
+      <div data-tour="spot-to-let">
+        <StackButton icon={Camera} label="Spot a To-Let" onClick={onSpotToLet} />
+      </div>
+      <div className="flex flex-col gap-5" data-tour="icon-stack-rest">
+        <StackButton icon={Bus} label="Bus Routes" active={busRoutesOn} onClick={onToggleBusRoutes} />
+        <StackButton icon={GraduationCap} label="Schools" active={schoolsOn} onClick={onToggleSchools} />
+        <StackButton icon={Satellite} label="Satellite" active={satelliteOn} onClick={onToggleSatellite} />
+        <StackButton icon={MoreHorizontal} label="More" onClick={onMore} />
+      </div>
     </div>
   );
 }

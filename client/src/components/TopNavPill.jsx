@@ -37,6 +37,9 @@ export default function TopNavPill({ avlbFlatsActive = false, onAvlbFlatsClick }
             to={item.to}
             end={item.end}
             className={({ isActive }) => pillClass(isActive)}
+            // HowToUseTour's last step spotlights this specific pill —
+            // undefined on every other item so it's a no-op DOM attribute.
+            data-tour={item.key === "how-to-use" ? "how-to-use-pill" : undefined}
           >
             <span className="text-base leading-none">{item.icon}</span>
             <span className="hidden sm:inline">{item.label}</span>

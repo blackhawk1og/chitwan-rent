@@ -20,6 +20,12 @@ router.get("/", async (req, res) => {
   const conditions = [];
   const params = [];
 
+  // 3 reports pulls a flat off the map entirely (see the report route below,
+  // and ReportReasonModal's "After 3 flags it's removed from the map" copy)
+  // — unconditional, not tied to the status filter, since a heavily-reported
+  // listing shouldn't be visible under any filter combination.
+  conditions.push(`f.report_count < 3`);
+
   if (status) {
     params.push(status);
     conditions.push(`f.status = $${params.length}`);

@@ -21,6 +21,7 @@ import SlidePanel from "./SlidePanel.jsx";
 import Modal from "./Modal.jsx";
 import PhotoCarousel from "./PhotoCarousel.jsx";
 import InterestForm from "./InterestForm.jsx";
+import ReportReasonModal from "./ReportReasonModal.jsx";
 import CommentsSection from "./CommentsSection.jsx";
 import AuthGateModal from "./AuthGateModal.jsx";
 import { StarRatingDisplay, StarRatingInput } from "./StarRating.jsx";
@@ -77,6 +78,8 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
   // flatInterest's own mutation state — see handleSubmitInterest.
   const [interestSubmitting, setInterestSubmitting] = useState(false);
   const [interestSubmitError, setInterestSubmitError] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportSubmitError, setReportSubmitError] = useState(false);
   const [localRating, setLocalRating] = useState(null);
   const displayedRating = localRating ?? flat.rating;
 
@@ -143,7 +146,7 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
       setAuthGate("report");
       return;
     }
-    reportFlat.mutate(undefined, { onSuccess: () => setReported(true) });
+    setReportModalOpen(true);
   };
 
   const handleAuthSuccess = () => {
@@ -153,8 +156,19 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
       setPendingStars(0);
       setRatingModalOpen(true);
     } else if (target === "report") {
-      reportFlat.mutate(undefined, { onSuccess: () => setReported(true) });
+      setReportModalOpen(true);
     }
+  };
+
+  const handleSubmitReport = (reason) => {
+    setReportSubmitError(false);
+    reportFlat.mutate(reason, {
+      onSuccess: () => {
+        setReported(true);
+        setReportModalOpen(false);
+      },
+      onError: () => setReportSubmitError(true),
+    });
   };
 
   const handleSubmitRating = () => {
@@ -396,6 +410,15 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
           onSubmit={handleSubmitInterest}
           submitting={interestSubmitting}
           submitError={interestSubmitError ? "Something went wrong — please try again." : null}
+        />
+      )}
+
+      {reportModalOpen && (
+        <ReportReasonModal
+          onCancel={() => setReportModalOpen(false)}
+          onSubmit={handleSubmitReport}
+          submitting={reportFlat.isPending}
+          submitError={reportSubmitError ? "Couldn't submit report — please try again." : null}
         />
       )}
 
