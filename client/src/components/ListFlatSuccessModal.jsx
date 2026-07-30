@@ -25,7 +25,6 @@ export default function ListFlatSuccessModal({ flat, onClose }) {
   const [shareText, setShareText] = useState(DEFAULT_SHARE_MESSAGE);
   const [copied, setCopied] = useState(false);
 
-  const isFlatmate = flat.listing_type === "flatmate";
   const remainingSlots = 6 - photos.length;
 
   const handleFilesSelected = async (e) => {
@@ -79,9 +78,10 @@ export default function ListFlatSuccessModal({ flat, onClose }) {
       </div>
 
       <p className="mt-4 text-sm text-text-primary/90">
-        Your pin now has a {isFlatmate ? "purple ROOM AVBL" : "green WHOLE AVBL"} tag visible to everyone.
+        Verify your listing and your pin will be visible to everyone.
       </p>
-      <p className="mt-2 text-xs text-text-muted">We'll connect you with matches via email in the next 24 hours.</p>
+      <p className="mt-2 text-xs text-text-muted">We'll connect you with matches via email within 24 hours.</p>
+      <p className="mt-2 text-xs text-text-muted">*Check your spam folder if you don't see the verification email.</p>
 
       <div className="mt-5 border-t border-white/10 pt-5">
         <div className="flex items-center gap-2 text-sm font-bold text-text-primary">
