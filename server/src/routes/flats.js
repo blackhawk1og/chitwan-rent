@@ -4,6 +4,7 @@ import { isNearAnyRoute } from "../lib/geo.js";
 import { requireAuth } from "../lib/auth.js";
 import { generateVerificationToken } from "../lib/verification.js";
 import { sendVerificationEmail } from "../lib/email.js";
+import { checkListingRateLimit, recordListingAttempt } from "../lib/listingRateLimit.js";
 
 // Base URL for the link a verification email points at — see
 // routes/verifyListing.js, mounted at this same origin's /verify-listing.
@@ -128,12 +129,6 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// New listings don't have organic reviews yet — seed a placeholder rating in
-// the same 3.5-5.0 range as the seed data so the map's info-chip has something to show.
-function randomRating() {
-  return Number((3.5 + Math.random() * 1.5).toFixed(1));
-}
-
 router.post("/", requireAuth, async (req, res) => {
   const {
     listing_type, bhk, rent, deposit, furnishing, includes_maintenance,
@@ -142,6 +137,16 @@ router.post("/", requireAuth, async (req, res) => {
   } = req.body;
 
   try {
+    if (email) {
+      const rateLimit = await checkListingRateLimit(email);
+      if (!rateLimit.allowed) {
+        const hourWord = rateLimit.hoursRemaining === 1 ? "hour" : "hours";
+        return res.status(429).json({
+          error: `You can only list one flat every 24 hours. Try again in ~${rateLimit.hoursRemaining} ${hourWord}.`,
+        });
+      }
+    }
+
     if (email) {
       await query("UPDATE users SET email = COALESCE(email, $1) WHERE id = $2", [email, req.userId]);
     }
@@ -160,17 +165,22 @@ router.post("/", requireAuth, async (req, res) => {
 
     const verificationToken = generateVerificationToken();
 
+    // rating is deliberately omitted — real listings start with no rating at
+    // all (column defaults to NULL) rather than a fake placeholder, and only
+    // get one once a real community rating comes in (see POST /:id/rating).
+    // Seed/dummy listings are the only ones with a rating from the start —
+    // set directly by db/seed.js, untouched by this route.
     const result = await query(
       `INSERT INTO flats
         (owner_id, listing_type, bhk, rent, deposit, furnishing, includes_maintenance,
-         gated, who_lives, pets_allowed, parking_for, sqft, rating, one_liner, status, lat, lng, area, society_name, photos,
+         gated, who_lives, pets_allowed, parking_for, sqft, one_liner, status, lat, lng, area, society_name, photos,
          available_from, flatmate_gender_pref, food_pref, smoker_ok, verification_token, verification_token_expires_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'pending_verification',$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,now() + interval '24 hours')
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending_verification',$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,now() + interval '24 hours')
        RETURNING *`,
       [
         req.userId, listing_type ?? "flat", bhk, rent, deposit ?? null, furnishing,
         includes_maintenance ?? false, gated, who_lives ?? null, pets_allowed ?? null,
-        parking_for ?? 0, sqft ?? null, randomRating(), one_liner ?? null, lat, lng, area ?? null, society_name ?? null, photos ?? [],
+        parking_for ?? 0, sqft ?? null, one_liner ?? null, lat, lng, area ?? null, society_name ?? null, photos ?? [],
         available_from ?? null, flatmate_gender_pref ?? null, food_pref ?? null, smoker_ok ?? null,
         verificationToken,
       ]
@@ -178,6 +188,13 @@ router.post("/", requireAuth, async (req, res) => {
 
     const flat = result.rows[0];
     console.log(`Listing set to pending: flat ${flat.id}`);
+
+    if (email) {
+      // Recorded regardless of the listing's later outcome — see
+      // checkListingRateLimit's comment for why this can't just be derived
+      // from flats itself.
+      await recordListingAttempt(email);
+    }
 
     if (email) {
       try {
@@ -265,27 +282,41 @@ router.post("/:id/comments", requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/flats/:id/rating  { stars: 1-5 }
+// POST /api/flats/:id/rating  { locality_stars: 1-5, built_quality_stars: 1-5 }
 router.post("/:id/rating", requireAuth, async (req, res) => {
-  const stars = Number(req.body.stars);
-  if (!Number.isInteger(stars) || stars < 1 || stars > 5) {
-    return res.status(400).json({ error: "stars must be an integer between 1 and 5" });
+  const localityStars = Number(req.body.locality_stars);
+  const builtQualityStars = Number(req.body.built_quality_stars);
+  const isValidStars = (n) => Number.isInteger(n) && n >= 1 && n <= 5;
+  if (!isValidStars(localityStars) || !isValidStars(builtQualityStars)) {
+    return res.status(400).json({ error: "locality_stars and built_quality_stars must each be an integer between 1 and 5" });
   }
 
   try {
+    // Seed/dummy listings keep their fixed placeholder rating forever — the
+    // client never shows them the rating button, but guard it here too
+    // rather than trusting that alone.
+    const flatCheck = await query("SELECT is_seed FROM flats WHERE id = $1", [req.params.id]);
+    if (flatCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Flat not found" });
+    }
+    if (flatCheck.rows[0].is_seed) {
+      return res.status(400).json({ error: "This listing's rating can't be changed" });
+    }
+
     await query(
-      "INSERT INTO flat_ratings (flat_id, user_id, stars) VALUES ($1, $2, $3)",
-      [req.params.id, req.userId, stars]
+      "INSERT INTO flat_ratings (flat_id, user_id, locality_stars, built_quality_stars) VALUES ($1, $2, $3, $4)",
+      [req.params.id, req.userId, localityStars, builtQualityStars]
     );
     const result = await query(
-      `UPDATE flats SET rating = (SELECT AVG(stars) FROM flat_ratings WHERE flat_id = $1)
+      `UPDATE flats SET rating = (
+         SELECT AVG((locality_stars + built_quality_stars) / 2.0)
+         FROM flat_ratings
+         WHERE flat_id = $1 AND locality_stars IS NOT NULL AND built_quality_stars IS NOT NULL
+       )
        WHERE id = $1
        RETURNING rating`,
       [req.params.id]
     );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Flat not found" });
-    }
     res.status(201).json({ rating: result.rows[0].rating });
   } catch (err) {
     console.error(err);

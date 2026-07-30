@@ -36,7 +36,9 @@ CREATE TABLE flats (
   pets_allowed TEXT, -- 'yes'|'no'|'not_sure'
   parking_for INT DEFAULT 0,
   sqft INT,
-  rating DOUBLE PRECISION, -- 3.5-5.0, shown on the map's info-chip marker
+  rating DOUBLE PRECISION, -- seed listings: fixed 3.5-5.0 placeholder set at seed time, never changes.
+                            -- Real listings: NULL until the first real rating comes in, then the
+                            -- locality/built_quality average from flat_ratings (see POST /:id/rating).
   one_liner TEXT,
   status TEXT DEFAULT 'available', -- 'available' | 'rented' | 'pending_review'
   lat DOUBLE PRECISION,
@@ -57,12 +59,15 @@ CREATE INDEX idx_flats_status ON flats(status);
 CREATE INDEX idx_flats_bhk ON flats(bhk);
 CREATE INDEX idx_flats_lat_lng ON flats(lat, lng);
 
--- Community rating (Phase 10): individual 1-5 star submissions, averaged into flats.rating.
+-- Community rating (Phase 10): two-dimension 1-5 star submissions (locality,
+-- built quality), averaged together into flats.rating. Real (non-seed)
+-- listings only — see is_seed and POST /:id/rating in routes/flats.js.
 CREATE TABLE flat_ratings (
   id SERIAL PRIMARY KEY,
   flat_id INT REFERENCES flats(id) ON DELETE CASCADE,
   user_id INT REFERENCES users(id),
-  stars INT CHECK (stars BETWEEN 1 AND 5),
+  locality_stars INT CHECK (locality_stars BETWEEN 1 AND 5),
+  built_quality_stars INT CHECK (built_quality_stars BETWEEN 1 AND 5),
   created_at TIMESTAMP DEFAULT now()
 );
 

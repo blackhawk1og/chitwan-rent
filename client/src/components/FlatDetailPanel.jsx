@@ -71,7 +71,8 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
   // collected inline in its own form now (email + phone, both required),
   // not via this shared gate; see openInterest / handleSubmitInterest.
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
-  const [pendingStars, setPendingStars] = useState(0);
+  const [pendingLocalityStars, setPendingLocalityStars] = useState(0);
+  const [pendingBuiltQualityStars, setPendingBuiltQualityStars] = useState(0);
   const [interestFormOpen, setInterestFormOpen] = useState(false);
   const [interestSent, setInterestSent] = useState(false);
   // Covers the full submit span (inline login + interest POST), not just
@@ -130,7 +131,8 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
       setAuthGate("rating");
       return;
     }
-    setPendingStars(0);
+    setPendingLocalityStars(0);
+    setPendingBuiltQualityStars(0);
     setRatingModalOpen(true);
   };
 
@@ -153,7 +155,8 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
     const target = authGate;
     setAuthGate(null);
     if (target === "rating") {
-      setPendingStars(0);
+      setPendingLocalityStars(0);
+      setPendingBuiltQualityStars(0);
       setRatingModalOpen(true);
     } else if (target === "report") {
       setReportModalOpen(true);
@@ -172,13 +175,16 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
   };
 
   const handleSubmitRating = () => {
-    if (!pendingStars) return;
-    rateFlat.mutate(pendingStars, {
-      onSuccess: (data) => {
-        setLocalRating(data.rating);
-        setRatingModalOpen(false);
-      },
-    });
+    if (!pendingLocalityStars || !pendingBuiltQualityStars) return;
+    rateFlat.mutate(
+      { localityStars: pendingLocalityStars, builtQualityStars: pendingBuiltQualityStars },
+      {
+        onSuccess: (data) => {
+          setLocalRating(data.rating);
+          setRatingModalOpen(false);
+        },
+      }
+    );
   };
 
   // Identity is collected right here, as part of InterestForm, rather than
@@ -356,24 +362,42 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
             </>
           )}
 
-          <button
-            type="button"
-            onClick={openRating}
-            className="mt-6 flex w-full items-center justify-between rounded-xl border border-white/10 bg-surface-alt px-4 py-3 text-left transition hover:bg-white/5"
-          >
-            <span className="text-xs font-bold uppercase tracking-wide text-text-muted">Community Rating</span>
-            {displayedRating != null ? (
-              <span className="flex items-center gap-2">
-                <StarRatingDisplay value={displayedRating} />
-                <span className="text-sm font-bold text-text-primary">{Number(displayedRating).toFixed(1)}</span>
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 text-sm font-semibold text-text-primary">
-                No ratings yet — tap to rate
-                <ChevronRight size={14} />
-              </span>
-            )}
-          </button>
+          {/* Seed/dummy listings show their fixed placeholder rating as plain
+              text — no click, no modal — since it's not a real community
+              rating and must never be overwritten (see is_seed guard in
+              POST /:id/rating). Real listings are the only ones that can
+              open the rating modal, and show nothing at all until a real
+              rating exists. */}
+          {isDummyListing ? (
+            <div className="mt-6 flex w-full items-center justify-between rounded-xl border border-white/10 bg-surface-alt px-4 py-3">
+              <span className="text-xs font-bold uppercase tracking-wide text-text-muted">Community Rating</span>
+              {displayedRating != null && (
+                <span className="flex items-center gap-2">
+                  <StarRatingDisplay value={displayedRating} />
+                  <span className="text-sm font-bold text-text-primary">{Number(displayedRating).toFixed(1)}</span>
+                </span>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={openRating}
+              className="mt-6 flex w-full items-center justify-between rounded-xl border border-white/10 bg-surface-alt px-4 py-3 text-left transition hover:bg-white/5"
+            >
+              <span className="text-xs font-bold uppercase tracking-wide text-text-muted">Community Rating</span>
+              {displayedRating != null ? (
+                <span className="flex items-center gap-2">
+                  <StarRatingDisplay value={displayedRating} />
+                  <span className="text-sm font-bold text-text-primary">{Number(displayedRating).toFixed(1)}</span>
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-sm font-semibold text-text-primary">
+                  No ratings yet — tap to rate
+                  <ChevronRight size={14} />
+                </span>
+              )}
+            </button>
+          )}
 
           <CommentsSection
             flatId={flat.id}
@@ -384,22 +408,38 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
       </SlidePanel>
 
       {ratingModalOpen && (
-        <Modal onClose={() => setRatingModalOpen(false)} maxWidthClass="max-w-xs">
-          <h2 className="text-lg font-bold text-text-primary">Rate this flat</h2>
-          <p className="mt-1 text-sm text-text-muted">How would you rate your experience?</p>
-          <div className="mt-5 flex justify-center">
-            <StarRatingInput value={pendingStars} onChange={setPendingStars} />
+        <Modal onClose={() => setRatingModalOpen(false)} maxWidthClass="max-w-sm">
+          <h2 className="pr-8 text-lg font-bold text-text-primary">Rate this listing</h2>
+
+          <div className="mt-5">
+            <div className="text-sm font-bold text-text-primary">Locality</div>
+            <p className="text-xs text-text-muted">Area quality, amenities, connectivity</p>
+            <div className="mt-2">
+              <StarRatingInput value={pendingLocalityStars} onChange={setPendingLocalityStars} />
+            </div>
           </div>
+
+          <div className="mt-5">
+            <div className="text-sm font-bold text-text-primary">Built Quality</div>
+            <p className="text-xs text-text-muted">Construction, interiors, maintenance</p>
+            <div className="mt-2">
+              <StarRatingInput value={pendingBuiltQualityStars} onChange={setPendingBuiltQualityStars} />
+            </div>
+          </div>
+
+          {(!pendingLocalityStars || !pendingBuiltQualityStars) && (
+            <p className="mt-4 text-center text-xs text-text-muted">Rate both dimensions to submit</p>
+          )}
           {rateFlat.isError && (
             <p className="mt-3 text-center text-sm text-red-400">Something went wrong — please try again.</p>
           )}
           <button
             type="button"
             onClick={handleSubmitRating}
-            disabled={!pendingStars || rateFlat.isPending}
+            disabled={!pendingLocalityStars || !pendingBuiltQualityStars || rateFlat.isPending}
             className="mt-5 w-full rounded-full bg-accent-purple py-3 text-sm font-bold text-white transition hover:bg-accent-purple-light disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {rateFlat.isPending ? "Submitting…" : "Submit rating"}
+            {rateFlat.isPending ? "Submitting…" : "Submit Rating"}
           </button>
         </Modal>
       )}

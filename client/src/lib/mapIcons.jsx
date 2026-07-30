@@ -381,7 +381,6 @@ const REPORT_BADGE_GAP_PX = 4;
 export function createFlatInfoChipIcon({ bhk, rent, rating, gated, sizeTier = "base", reportCount = 0 }) {
   const bhkLabel = bhk >= 5 ? "5+" : bhk;
   const priceLabel = `${(rent / 1000).toFixed(1)}K`;
-  const ratingLabel = rating != null ? Number(rating).toFixed(1) : "—";
   const background = GATED_CHIP_BG[gated] ?? "rgba(17,18,32,0.96)";
   const s = CHIP_SIZE_STYLES[sizeTier] ?? CHIP_SIZE_STYLES.base;
   const hasReports = reportCount > 0;
@@ -408,8 +407,12 @@ export function createFlatInfoChipIcon({ bhk, rent, rating, gated, sizeTier = "b
       <span style={{ fontSize: s.fontSize, fontWeight: 800, color: "#ffffff" }}>{bhkLabel}BHK</span>
       {divider}
       <span style={{ fontSize: s.fontSize, fontWeight: 800, color: "#ffffff" }}>{priceLabel}</span>
-      {divider}
-      <span style={{ fontSize: s.fontSize, fontWeight: 800, color: "#facc15" }}>★ {ratingLabel}</span>
+      {rating != null && (
+        <>
+          {divider}
+          <span style={{ fontSize: s.fontSize, fontWeight: 800, color: "#facc15" }}>★ {Number(rating).toFixed(1)}</span>
+        </>
+      )}
     </div>
   );
 

@@ -22,7 +22,13 @@ export async function postJson(path, body) {
   });
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({}));
-    throw new Error(errBody.error || `Request failed: ${res.status} ${res.statusText}`);
+    const err = new Error(errBody.error || `Request failed: ${res.status} ${res.statusText}`);
+    // Lets a caller distinguish e.g. a 429 (specific, actionable message)
+    // from other failures without re-parsing the message string — see
+    // handleSubmitListFlatDetails in MapShell.jsx for the one caller that
+    // currently needs this.
+    err.status = res.status;
+    throw err;
   }
   return res.json();
 }

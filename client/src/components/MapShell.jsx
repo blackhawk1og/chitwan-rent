@@ -231,7 +231,7 @@ export default function MapShell() {
   // Covers the full submit span (inline login + create), not just createFlat's
   // own mutation state — see handleSubmitListFlatDetails.
   const [listFlatSubmitting, setListFlatSubmitting] = useState(false);
-  const [listFlatSubmitError, setListFlatSubmitError] = useState(false);
+  const [listFlatSubmitError, setListFlatSubmitError] = useState(null);
 
   // "Your Pin" marker replacing the plain draggable dot once Step 0 is
   // submitted — recomputed only when the underlying bhk/rent change.
@@ -462,7 +462,7 @@ export default function MapShell() {
     const step0 = listFlatStep0Data;
     const isFlatmate = listFlatBranch === "flatmate";
     setListFlatSubmitting(true);
-    setListFlatSubmitError(false);
+    setListFlatSubmitError(null);
     try {
       await login({ email: detailsForm.email, phone: detailsForm.phone });
       const created = await createFlat.mutateAsync({
@@ -495,8 +495,12 @@ export default function MapShell() {
       mapRef.current?.flyTo([created.lat, created.lng], 16, { duration: 1 });
       setListFlatCreatedFlat(created);
       setListFlatPostStep("success");
-    } catch {
-      setListFlatSubmitError(true);
+    } catch (err) {
+      // The rate-limit's 429 carries a specific, actionable message ("try
+      // again in ~X hours") worth showing verbatim — everything else
+      // (validation, network, 500s) collapses to one generic message rather
+      // than surfacing a raw/technical error string.
+      setListFlatSubmitError(err.status === 429 ? err.message : "Something went wrong — please try again.");
     } finally {
       setListFlatSubmitting(false);
     }
@@ -908,7 +912,7 @@ export default function MapShell() {
           onClose={handleCancelListFlatPostSteps}
           onSubmit={handleSubmitListFlatDetails}
           submitting={listFlatSubmitting}
-          submitError={listFlatSubmitError ? "Something went wrong — please try again." : null}
+          submitError={listFlatSubmitError}
         />
       )}
 
