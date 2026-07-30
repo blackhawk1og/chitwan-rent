@@ -12,6 +12,8 @@ import poisRouter from "./routes/pois.js";
 import placesRouter from "./routes/places.js";
 import authRouter from "./routes/auth.js";
 import rentReportsRouter from "./routes/rentReports.js";
+import verifyListingRouter from "./routes/verifyListing.js";
+import { startExpiredListingsCleanup } from "./lib/cleanupExpiredListings.js";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -47,6 +49,12 @@ app.use("/api/places", placesRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/rent-reports", rentReportsRouter);
 
+// Not under /api — this is the literal link a browser navigates to from the
+// verification email (see lib/email.js), not a JSON endpoint the SPA calls.
+app.use("/verify-listing", verifyListingRouter);
+
 app.listen(PORT, () => {
   console.log(`API server listening on http://localhost:${PORT}`);
 });
+
+startExpiredListingsCleanup();

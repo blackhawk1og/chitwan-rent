@@ -2,6 +2,12 @@ import { Router } from "express";
 import { query } from "../db.js";
 import { isNearAnyRoute } from "../lib/geo.js";
 import { requireAuth } from "../lib/auth.js";
+import { generateVerificationToken } from "../lib/verification.js";
+import { sendVerificationEmail } from "../lib/email.js";
+
+// Base URL for the link a verification email points at — see
+// routes/verifyListing.js, mounted at this same origin's /verify-listing.
+const SERVER_BASE_URL = process.env.SERVER_BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
 
 const router = Router();
 
@@ -25,6 +31,11 @@ router.get("/", async (req, res) => {
   // — unconditional, not tied to the status filter, since a heavily-reported
   // listing shouldn't be visible under any filter combination.
   conditions.push(`f.report_count < 3`);
+  // Unverified listings (owner hasn't clicked the emailed link yet) are
+  // never publicly visible — same unconditional treatment as report_count
+  // above, not tied to the status filter, so this holds even when no status
+  // filter is requested at all (the map's default fetch).
+  conditions.push(`f.status != 'pending_verification'`);
 
   if (status) {
     params.push(status);
@@ -100,7 +111,13 @@ router.get("/", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   try {
-    const result = await query(`${SELECT_WITH_OWNER} WHERE f.id = $1`, [req.params.id]);
+    // Same unverified-listings-stay-hidden rule as GET / above — a direct
+    // link to a still-pending flat's detail page 404s exactly like a flat
+    // that doesn't exist, rather than leaking it.
+    const result = await query(
+      `${SELECT_WITH_OWNER} WHERE f.id = $1 AND f.status != 'pending_verification'`,
+      [req.params.id]
+    );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Flat not found" });
     }
@@ -110,10 +127,6 @@ router.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch flat" });
   }
 });
-
-// Dummy "feels alive" touch: a fresh listing starts pending_review and
-// silently flips to available a few seconds later, no manual moderation step.
-const AUTO_AVAILABLE_DELAY_MS = 8000;
 
 // New listings don't have organic reviews yet — seed a placeholder rating in
 // the same 3.5-5.0 range as the seed data so the map's info-chip has something to show.
@@ -145,27 +158,46 @@ router.post("/", requireAuth, async (req, res) => {
       }
     }
 
+    const verificationToken = generateVerificationToken();
+
     const result = await query(
       `INSERT INTO flats
         (owner_id, listing_type, bhk, rent, deposit, furnishing, includes_maintenance,
          gated, who_lives, pets_allowed, parking_for, sqft, rating, one_liner, status, lat, lng, area, society_name, photos,
-         available_from, flatmate_gender_pref, food_pref, smoker_ok)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'pending_review',$15,$16,$17,$18,$19,$20,$21,$22,$23)
+         available_from, flatmate_gender_pref, food_pref, smoker_ok, verification_token, verification_token_expires_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'pending_verification',$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,now() + interval '24 hours')
        RETURNING *`,
       [
         req.userId, listing_type ?? "flat", bhk, rent, deposit ?? null, furnishing,
         includes_maintenance ?? false, gated, who_lives ?? null, pets_allowed ?? null,
         parking_for ?? 0, sqft ?? null, randomRating(), one_liner ?? null, lat, lng, area ?? null, society_name ?? null, photos ?? [],
         available_from ?? null, flatmate_gender_pref ?? null, food_pref ?? null, smoker_ok ?? null,
+        verificationToken,
       ]
     );
 
     const flat = result.rows[0];
-    setTimeout(() => {
-      query("UPDATE flats SET status = 'available' WHERE id = $1 AND status = 'pending_review'", [flat.id]).catch(
-        (err) => console.error("Failed to auto-flip flat to available:", err)
-      );
-    }, AUTO_AVAILABLE_DELAY_MS);
+    console.log(`Listing set to pending: flat ${flat.id}`);
+
+    if (email) {
+      try {
+        await sendVerificationEmail({
+          to: email,
+          verifyUrl: `${SERVER_BASE_URL}/verify-listing?token=${verificationToken}`,
+        });
+        console.log(`Verification email sent: flat ${flat.id}`);
+      } catch (emailErr) {
+        // Sending failed — the listing stays pending_verification either
+        // way (never deleted just because the email didn't go out); the
+        // owner can be told to retry from the client if needed.
+        console.error(`Verification email failed: flat ${flat.id}`, emailErr.message);
+      }
+    }
+
+    // Never leaves this process — a token in the create-response would let
+    // the browser verify its own listing without ever touching the email.
+    delete flat.verification_token;
+    delete flat.verification_token_expires_at;
 
     res.status(201).json(flat);
   } catch (err) {

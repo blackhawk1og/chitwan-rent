@@ -16,13 +16,15 @@
     "seed:places": "node db/seed-places.js",
     "add:flats-society-name": "node db/add-flats-society-name.js",
     "add:flats-is-seed": "node db/add-flats-is-seed.js",
-    "add:flat-reports-table": "node db/add-flat-reports-table.js"
+    "add:flat-reports-table": "node db/add-flat-reports-table.js",
+    "add:flat-verification": "node db/add-flat-verification.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^6.10.1",
     "pg": "^8.13.1"
   }
 }

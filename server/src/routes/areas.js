@@ -15,7 +15,7 @@ router.get("/", async (req, res) => {
     const result = await query(
       `SELECT area, AVG(lat) AS lat, AVG(lng) AS lng, COUNT(*) AS count
        FROM flats
-       WHERE area IS NOT NULL
+       WHERE area IS NOT NULL AND status != 'pending_verification'
        GROUP BY area`
     );
     const liveByName = new Map(result.rows.map((r) => [r.area, r]));
