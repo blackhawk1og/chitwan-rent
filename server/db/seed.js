@@ -181,8 +181,8 @@ async function seedSeekerPins(users, count = 40) {
       `INSERT INTO seeker_pins
         (user_id, looking_for, budget, bhk_pref, move_in, food_pref, smoker_ok,
          gender, flatmate_gender_pref, parking_required, lifestyle_note, email, phone,
-         lat, lng, area, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+         lat, lng, area, created_at, is_seed)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,true)`,
       [
         user.id,
         pick(["whole_flat", "room"]),

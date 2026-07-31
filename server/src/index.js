@@ -14,6 +14,7 @@ import authRouter from "./routes/auth.js";
 import rentReportsRouter from "./routes/rentReports.js";
 import verifyListingRouter from "./routes/verifyListing.js";
 import { startExpiredListingsCleanup } from "./lib/cleanupExpiredListings.js";
+import { startMatchingJob } from "./lib/matchingJob.js";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -58,3 +59,4 @@ app.listen(PORT, () => {
 });
 
 startExpiredListingsCleanup();
+startMatchingJob();

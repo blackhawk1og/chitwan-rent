@@ -159,3 +159,94 @@ export async function sendDeleteCodeEmail({ to, flatId, code }) {
     html: deleteCodeEmailHtml({ flatId, code }),
   });
 }
+
+// matchName comes from users.name — free text someone typed into the
+// optional "Your name" field at sign-in (see AuthGateModal.jsx) — the first
+// place this file interpolates user-supplied text into an HTML email, so it
+// (and the contact fields, for defense-in-depth) get escaped before going
+// into the template.
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function matchEmailHtml({ matchName, matchEmail, matchPhone }) {
+  const intro = matchName
+    ? `<strong>${escapeHtml(matchName)}</strong> looks like a compatible match`
+    : "We found a compatible match";
+
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background-color:#f4f4f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f7;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+            <tr>
+              <td style="background-color:${BRAND_PURPLE};padding:24px 32px;">
+                <span style="color:#ffffff;font-size:18px;font-weight:700;">Chitwan Rent</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px 32px 8px;">
+                <h1 style="margin:0 0 16px;font-size:20px;color:#111827;">You've got a compatible match!</h1>
+
+                <p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:#374151;">
+                  ${intro} for your room listing, within 2km on Chitwan Rent. There's no in-app messaging here
+                  — this email is the only way matches get connected, so reach out directly using the contact
+                  below.
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 20px;">
+                  <tr>
+                    <td style="border-radius:12px;background-color:#f4f4f7;padding:18px 20px;">
+                      <p style="margin:0 0 4px;font-size:12px;color:#6b7280;">Email</p>
+                      <p style="margin:0 0 14px;font-size:15px;font-weight:700;color:#111827;">${escapeHtml(matchEmail || "Not provided")}</p>
+                      <p style="margin:0 0 4px;font-size:12px;color:#6b7280;">Phone</p>
+                      <p style="margin:0;font-size:15px;font-weight:700;color:#111827;">${escapeHtml(matchPhone || "Not provided")}</p>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 4px;font-size:12px;color:#9ca3af;">
+                  New compatible matches keep getting emailed like this as long as your pin stays active —
+                  removing it stops future contact sharing.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 32px 28px;">
+                <p style="margin:0;font-size:12px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:16px;">
+                  If this doesn't seem relevant to you, you can safely ignore this email.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+// Fired by the periodic matching job (lib/matchingJob.js) whenever a new
+// compatible flat/seeker-pin pair is found — once per side, per pair (the
+// matches table's UNIQUE(flat_id, seeker_pin_id) is what stops this firing
+// again for the same pair on the job's next run). MATCH_REVIEW_CC is an
+// optional env var for an abuse-review inbox; unset by default, no
+// hardcoded address. Same throw-on-failure contract as the other
+// send*Email functions — the caller (matchingJob.js) logs per-email
+// failures and keeps going rather than letting one bad send abort the job.
+export async function sendMatchEmail({ to, matchName, matchEmail, matchPhone, listingType }) {
+  await transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to,
+    ...(process.env.MATCH_REVIEW_CC ? { cc: process.env.MATCH_REVIEW_CC } : {}),
+    subject: "You've got a compatible match on Chitwan Rent",
+    html: matchEmailHtml({ matchName, matchEmail, matchPhone, listingType }),
+  });
+}

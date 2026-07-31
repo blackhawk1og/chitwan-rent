@@ -22,7 +22,8 @@
     "add:flat-ratings-dimensions": "node db/add-flat-ratings-dimensions.js",
     "add:flat-delete-code": "node db/add-flat-delete-code.js",
     "add:delete-attempts-table": "node db/add-delete-attempts-table.js",
-    "add:flats-description": "node db/add-flats-description.js"
+    "add:flats-description": "node db/add-flats-description.js",
+    "add:flatmate-matching": "node db/add-flatmate-matching.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

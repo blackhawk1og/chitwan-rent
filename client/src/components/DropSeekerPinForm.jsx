@@ -244,6 +244,13 @@ export default function DropSeekerPinForm({ lat, lng, onCancel, onSubmit, submit
             error={phoneError}
             helper="Private — only shared when we find a match for you."
           />
+
+          {form.lookingFor === "room" && (
+            <p className="text-xs text-text-muted">
+              For room searches, your email and phone are shared by email with compatible room listings within
+              2km — only while your pin stays active.
+            </p>
+          )}
         </div>
       </div>
 

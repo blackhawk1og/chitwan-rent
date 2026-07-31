@@ -188,6 +188,13 @@ export default function ListFlatDetailsForm({
           error={phoneError}
           helper="Private — only shared with matched seekers."
         />
+
+        {isFlatmate && (
+          <p className="text-xs text-text-muted">
+            For room listings, your email and phone are shared by email with compatible seekers within 2km —
+            only while your pin stays active.
+          </p>
+        )}
       </div>
 
       {submitError && <p className="mt-4 text-sm text-red-400">{submitError}</p>}
