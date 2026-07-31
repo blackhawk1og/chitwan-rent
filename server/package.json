@@ -19,7 +19,10 @@
     "add:flat-reports-table": "node db/add-flat-reports-table.js",
     "add:flat-verification": "node db/add-flat-verification.js",
     "add:listing-attempts-table": "node db/add-listing-attempts-table.js",
-    "add:flat-ratings-dimensions": "node db/add-flat-ratings-dimensions.js"
+    "add:flat-ratings-dimensions": "node db/add-flat-ratings-dimensions.js",
+    "add:flat-delete-code": "node db/add-flat-delete-code.js",
+    "add:delete-attempts-table": "node db/add-delete-attempts-table.js",
+    "add:flats-description": "node db/add-flats-description.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

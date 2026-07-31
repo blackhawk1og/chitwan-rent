@@ -8,6 +8,7 @@ import TextField from "./ui/TextField.jsx";
 import { useNearbyStats } from "../hooks/useNearbyStats.js";
 import { formatRs } from "../lib/format.js";
 import { isValidEmail, isValidPhone, sanitizePhoneInput } from "../lib/validation.js";
+import { useDebouncedValue } from "../hooks/useDebouncedValue.js";
 
 const BHK_PREF_OPTIONS = [
   { value: "1", label: "1" },
@@ -56,8 +57,10 @@ export default function DropSeekerPinForm({ lat, lng, onCancel, onSubmit, submit
   const [form, setForm] = useState(initialForm);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
-  const emailError = form.email !== "" && !isValidEmail(form.email) ? "Enter a valid email address" : null;
-  const phoneError = form.phone !== "" && !isValidPhone(form.phone) ? "Enter a valid 10-digit mobile number" : null;
+  const debouncedEmail = useDebouncedValue(form.email);
+  const debouncedPhone = useDebouncedValue(form.phone);
+  const emailError = debouncedEmail !== "" && !isValidEmail(debouncedEmail) ? "Enter a valid email address" : null;
+  const phoneError = debouncedPhone !== "" && !isValidPhone(debouncedPhone) ? "Enter a valid 10-digit mobile number" : null;
   const isValid =
     form.lookingFor !== null &&
     form.budget !== "" &&

@@ -5,6 +5,10 @@ import { requireAuth } from "../lib/auth.js";
 import { generateVerificationToken } from "../lib/verification.js";
 import { sendVerificationEmail } from "../lib/email.js";
 import { checkListingRateLimit, recordListingAttempt } from "../lib/listingRateLimit.js";
+import { hashDeleteCode, deleteCodeHashMatches } from "../lib/deleteCode.js";
+import { checkDeleteAttemptLimit, recordFailedDeleteAttempt } from "../lib/deleteAttemptLimit.js";
+
+const DELETE_ELIGIBILITY_DELAY_MS = 24 * 60 * 60 * 1000;
 
 // Base URL for the link a verification email points at — see
 // routes/verifyListing.js, mounted at this same origin's /verify-listing.
@@ -132,7 +136,7 @@ router.get("/:id", async (req, res) => {
 router.post("/", requireAuth, async (req, res) => {
   const {
     listing_type, bhk, rent, deposit, furnishing, includes_maintenance,
-    gated, who_lives, pets_allowed, parking_for, sqft, one_liner, lat, lng, area, society_name, photos, email, phone,
+    gated, who_lives, pets_allowed, parking_for, sqft, one_liner, description, lat, lng, area, society_name, photos, email, phone,
     available_from, flatmate_gender_pref, food_pref, smoker_ok,
   } = req.body;
 
@@ -173,14 +177,14 @@ router.post("/", requireAuth, async (req, res) => {
     const result = await query(
       `INSERT INTO flats
         (owner_id, listing_type, bhk, rent, deposit, furnishing, includes_maintenance,
-         gated, who_lives, pets_allowed, parking_for, sqft, one_liner, status, lat, lng, area, society_name, photos,
+         gated, who_lives, pets_allowed, parking_for, sqft, one_liner, description, status, lat, lng, area, society_name, photos,
          available_from, flatmate_gender_pref, food_pref, smoker_ok, verification_token, verification_token_expires_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending_verification',$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,now() + interval '24 hours')
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'pending_verification',$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,now() + interval '24 hours')
        RETURNING *`,
       [
         req.userId, listing_type ?? "flat", bhk, rent, deposit ?? null, furnishing,
         includes_maintenance ?? false, gated, who_lives ?? null, pets_allowed ?? null,
-        parking_for ?? 0, sqft ?? null, one_liner ?? null, lat, lng, area ?? null, society_name ?? null, photos ?? [],
+        parking_for ?? 0, sqft ?? null, one_liner ?? null, description ?? null, lat, lng, area ?? null, society_name ?? null, photos ?? [],
         available_from ?? null, flatmate_gender_pref ?? null, food_pref ?? null, smoker_ok ?? null,
         verificationToken,
       ]
@@ -365,6 +369,71 @@ router.post("/:id/interest", requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to submit interest" });
+  }
+});
+
+// POST /api/flats/:id/delete  { code }  — no auth required. The 10-digit
+// code emailed at verification time (see lib/verification.js) is the
+// credential here, consistent with this app's login-free find-or-create
+// auth; deleting does NOT reset or interact with the listing rate limit
+// (see lib/listingRateLimit.js) in any way.
+router.post("/:id/delete", async (req, res) => {
+  const flatId = req.params.id;
+  const code = typeof req.body.code === "string" ? req.body.code.trim() : "";
+
+  if (!/^\d{10}$/.test(code)) {
+    return res.status(400).json({ error: "Code must be a 10-digit number" });
+  }
+
+  try {
+    const result = await query(
+      "SELECT id, email_verified_at, delete_code_hash FROM flats WHERE id = $1",
+      [flatId]
+    );
+    if (result.rows.length === 0) {
+      console.log(`Delete attempt failed on wrong code: flat ${flatId}`);
+      return res.status(400).json({ error: "Flat ID or code is incorrect" });
+    }
+
+    const flat = result.rows[0];
+
+    // Eligibility is a business rule, not a security boundary, so — per
+    // spec — it's checked before the code at all, and is fine to answer
+    // with a specific reason rather than the generic wrong-ID-or-code
+    // message below. No email_verified_at at all (e.g. seed/dummy data,
+    // which never goes through verification) collapses into the same
+    // "not eligible" branch, just without a date to name.
+    const eligibleAt = flat.email_verified_at ? new Date(flat.email_verified_at).getTime() + DELETE_ELIGIBILITY_DELAY_MS : null;
+    if (!eligibleAt || eligibleAt > Date.now()) {
+      console.log(`Delete attempt rejected as not-yet-eligible: flat ${flatId}`);
+      return res.status(400).json({
+        error: eligibleAt
+          ? `This listing can be deleted starting ${new Date(eligibleAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}, 24 hours after verification.`
+          : "This listing isn't eligible for deletion yet.",
+      });
+    }
+
+    const attemptLimit = await checkDeleteAttemptLimit(flatId);
+    if (!attemptLimit.allowed) {
+      return res.status(429).json({ error: "Too many incorrect attempts. Please try again later." });
+    }
+
+    if (!deleteCodeHashMatches(hashDeleteCode(code), flat.delete_code_hash)) {
+      await recordFailedDeleteAttempt(flatId);
+      console.log(`Delete attempt failed on wrong code: flat ${flatId}`);
+      return res.status(400).json({ error: "Flat ID or code is incorrect" });
+    }
+
+    // Hard delete, same as the expired-listing cleanup job — flat_ratings,
+    // flat_comments, flat_reports, and flat_interests all FK to flats.id
+    // with ON DELETE CASCADE already, so no dependent-row cleanup is needed
+    // here.
+    await query("DELETE FROM flats WHERE id = $1", [flatId]);
+    console.log(`Flat deleted successfully: flat ${flatId}`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete flat" });
   }
 });
 

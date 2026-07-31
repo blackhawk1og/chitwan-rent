@@ -6,7 +6,6 @@ import Pill from "./ui/Pill.jsx";
 import ToggleButton from "./ui/ToggleButton.jsx";
 import SectionLabel from "./ui/SectionLabel.jsx";
 import TextField from "./ui/TextField.jsx";
-import { isValidEmail } from "../lib/validation.js";
 
 const BHK_OPTIONS = [
   { value: 1, label: "1" },
@@ -34,7 +33,7 @@ const initialForm = {
   parkingFor: "",
   sqft: "",
   societyName: "",
-  email: "",
+  description: "",
   oneLiner: "",
 };
 
@@ -43,15 +42,13 @@ export default function AddFlatForm({ onCancel, onSubmit, submitting, submitErro
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
-  const emailError = form.email !== "" && !isValidEmail(form.email) ? "Enter a valid email address" : null;
   const isValid =
     form.bhk !== null &&
     form.rent !== "" &&
     form.furnishing !== null &&
     form.gated !== null &&
     form.parkingFor !== "" &&
-    form.societyName !== "" &&
-    !emailError;
+    form.societyName !== "";
 
   const handleSubmit = () => {
     if (!isValid || submitting) return;
@@ -197,13 +194,11 @@ export default function AddFlatForm({ onCancel, onSubmit, submitting, submitErro
           />
 
           <TextField
-            label="Your email (optional)"
-            type="email"
-            placeholder="you@example.com"
-            value={form.email}
-            onChange={(e) => set({ email: e.target.value })}
-            error={emailError}
-            helper="Never shown publicly."
+            label="Flat description (optional)"
+            type="text"
+            placeholder="2 bedrooms +1 kitchen"
+            value={form.description}
+            onChange={(e) => set({ description: e.target.value })}
           />
 
           <TextField

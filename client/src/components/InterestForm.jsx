@@ -2,6 +2,7 @@ import { useState } from "react";
 import Modal from "./Modal.jsx";
 import TextField from "./ui/TextField.jsx";
 import { isValidEmail, isValidPhone, sanitizePhoneInput } from "../lib/validation.js";
+import { useDebouncedValue } from "../hooks/useDebouncedValue.js";
 
 export default function InterestForm({ onCancel, onSubmit, submitting, submitError }) {
   const [name, setName] = useState("");
@@ -9,8 +10,10 @@ export default function InterestForm({ onCancel, onSubmit, submitting, submitErr
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
 
-  const emailError = email !== "" && !isValidEmail(email) ? "Enter a valid email address" : null;
-  const phoneError = phone !== "" && !isValidPhone(phone) ? "Enter a valid 10-digit mobile number" : null;
+  const debouncedEmail = useDebouncedValue(email);
+  const debouncedPhone = useDebouncedValue(phone);
+  const emailError = debouncedEmail !== "" && !isValidEmail(debouncedEmail) ? "Enter a valid email address" : null;
+  const phoneError = debouncedPhone !== "" && !isValidPhone(debouncedPhone) ? "Enter a valid 10-digit mobile number" : null;
   const isValid = name.trim() !== "" && isValidEmail(email) && isValidPhone(phone);
 
   const handleSubmit = () => {

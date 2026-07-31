@@ -306,6 +306,13 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
             {flat.area && <span> · {flat.area}</span>}
           </div>
 
+          {flat.description && (
+            <div className="mt-5">
+              <div className="text-xs font-bold uppercase tracking-wide text-text-muted">Description</div>
+              <p className="mt-1.5 text-sm text-text-primary/90">{flat.description}</p>
+            </div>
+          )}
+
           {flat.one_liner && (
             <div className="mt-5">
               <div className="text-xs font-bold uppercase tracking-wide text-text-muted">Tenant said</div>

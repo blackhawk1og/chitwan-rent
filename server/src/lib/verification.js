@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { query } from "../db.js";
+import { generateDeleteCode, hashDeleteCode } from "./deleteCode.js";
 
 // 256 bits, URL-safe — cryptographically unguessable, no sequential/internal
 // ID ever exposed in the verification link (see routes/flats.js's POST /
@@ -17,18 +18,32 @@ export function generateVerificationToken() {
 // existed (both find nothing), so they intentionally share the "invalid"
 // reason below; only "expired" (row still there, just past its window,
 // waiting on the cleanup sweep) stays distinguishable.
+//
+// The delete-flat feature's 10-digit code is generated and hashed into the
+// same atomic UPDATE (delete_code_hash) rather than a separate write — this
+// is the one moment a listing becomes verified, so it's also the one moment
+// the code should come into existence (see routes/flats.js's POST
+// /:id/delete, which the code is for). The plaintext is returned only for
+// the caller (routes/verifyListing.js) to email once; it's never stored or
+// logged anywhere.
 export async function verifyListingByToken(token) {
   if (!token || typeof token !== "string") return { ok: false, reason: "invalid" };
 
+  const deleteCode = generateDeleteCode();
+  const deleteCodeHash = hashDeleteCode(deleteCode);
+
   const updated = await query(
     `UPDATE flats
-     SET status = 'available', email_verified_at = now(), verification_token = NULL, verification_token_expires_at = NULL
+     SET status = 'available', email_verified_at = now(), verification_token = NULL, verification_token_expires_at = NULL,
+         delete_code_hash = $2
      WHERE verification_token = $1 AND status = 'pending_verification' AND verification_token_expires_at > now()
-     RETURNING id`,
-    [token]
+     RETURNING id, owner_id`,
+    [token, deleteCodeHash]
   );
   if (updated.rows.length > 0) {
-    return { ok: true, flatId: updated.rows[0].id };
+    const { id: flatId, owner_id: ownerId } = updated.rows[0];
+    const owner = await query("SELECT email FROM users WHERE id = $1", [ownerId]);
+    return { ok: true, flatId, deleteCode, email: owner.rows[0]?.email ?? null };
   }
 
   const existing = await query(

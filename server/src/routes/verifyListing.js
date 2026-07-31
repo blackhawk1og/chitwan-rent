@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { verifyListingByToken } from "../lib/verification.js";
+import { sendDeleteCodeEmail } from "../lib/email.js";
 
 // Mounted directly at /verify-listing (not under /api — see index.js) since
 // this is the literal link a user clicks from their email, not a JSON
@@ -50,6 +51,19 @@ router.get("/", async (req, res) => {
 
     if (result.ok) {
       console.log(`Listing verified: flat ${result.flatId}`);
+
+      if (result.email) {
+        try {
+          await sendDeleteCodeEmail({ to: result.email, flatId: result.flatId, code: result.deleteCode });
+          console.log(`Delete code generated & emailed: flat ${result.flatId}`);
+        } catch (emailErr) {
+          // Same contract as the verification email itself — the listing is
+          // already live either way, so a failed send here never turns this
+          // response into a failure page.
+          console.error(`Delete code email failed: flat ${result.flatId}`, emailErr.message);
+        }
+      }
+
       return res.send(
         renderPage("Listing verified!", "Your flat is now live on the map. Thanks for confirming it's really you.", true)
       );

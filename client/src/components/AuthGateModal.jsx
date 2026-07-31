@@ -4,6 +4,7 @@ import Modal from "./Modal.jsx";
 import TextField from "./ui/TextField.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { isValidEmail, isValidPhone, sanitizePhoneInput } from "../lib/validation.js";
+import { useDebouncedValue } from "../hooks/useDebouncedValue.js";
 
 export default function AuthGateModal({ onSuccess, onCancel }) {
   const { login } = useAuth();
@@ -13,9 +14,14 @@ export default function AuthGateModal({ onSuccess, onCancel }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  const emailError = email.trim() !== "" && !isValidEmail(email) ? "Enter a valid email address" : null;
-  const phoneError = phone.trim() !== "" && !isValidPhone(phone) ? "Enter a valid 10-digit mobile number" : null;
-  const isValid = (email.trim() !== "" || phone.trim() !== "") && !emailError && !phoneError;
+  const debouncedEmail = useDebouncedValue(email);
+  const debouncedPhone = useDebouncedValue(phone);
+  const emailError = debouncedEmail.trim() !== "" && !isValidEmail(debouncedEmail) ? "Enter a valid email address" : null;
+  const phoneError = debouncedPhone.trim() !== "" && !isValidPhone(debouncedPhone) ? "Enter a valid 10-digit mobile number" : null;
+  const isValid =
+    (email.trim() !== "" || phone.trim() !== "") &&
+    (email.trim() === "" || isValidEmail(email)) &&
+    (phone.trim() === "" || isValidPhone(phone));
 
   const handleSubmit = async () => {
     if (!isValid || submitting) return;

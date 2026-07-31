@@ -6,6 +6,7 @@ import ToggleButton from "./ui/ToggleButton.jsx";
 import SectionLabel from "./ui/SectionLabel.jsx";
 import TextField from "./ui/TextField.jsx";
 import { isValidEmail, isValidPhone, sanitizePhoneInput } from "../lib/validation.js";
+import { useDebouncedValue } from "../hooks/useDebouncedValue.js";
 
 const AVAILABLE_FROM_OPTIONS = [
   { value: "asap", label: "ASAP" },
@@ -39,8 +40,10 @@ export default function ListFlatDetailsForm({
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
   const isFlatmate = mode === "flatmate";
-  const emailError = form.email !== "" && !isValidEmail(form.email) ? "Enter a valid email address" : null;
-  const phoneError = form.phone !== "" && !isValidPhone(form.phone) ? "Enter a valid 10-digit mobile number" : null;
+  const debouncedEmail = useDebouncedValue(form.email);
+  const debouncedPhone = useDebouncedValue(form.phone);
+  const emailError = debouncedEmail !== "" && !isValidEmail(debouncedEmail) ? "Enter a valid email address" : null;
+  const phoneError = debouncedPhone !== "" && !isValidPhone(debouncedPhone) ? "Enter a valid 10-digit mobile number" : null;
   const isValid =
     form.availableFrom !== null &&
     isValidEmail(form.email) &&

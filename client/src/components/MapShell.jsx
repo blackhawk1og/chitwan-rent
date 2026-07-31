@@ -480,6 +480,7 @@ export default function MapShell() {
         sqft: step0.sqft === "" ? null : Number(step0.sqft),
         society_name: step0.societyName || null,
         one_liner: step0.oneLiner || null,
+        description: step0.description || null,
         email: detailsForm.email || null,
         phone: detailsForm.phone || null,
         available_from: detailsForm.availableFrom,
