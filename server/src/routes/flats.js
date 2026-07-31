@@ -253,6 +253,33 @@ router.patch("/:id/photos", requireAuth, async (req, res) => {
   }
 });
 
+// DELETE /api/flats/:id/photos  { url } — removes one photo from the
+// listing's photos array. Owner-only, same ownership check as the PATCH
+// above.
+router.delete("/:id/photos", requireAuth, async (req, res) => {
+  const { url } = req.body;
+  if (!url) {
+    return res.status(400).json({ error: "url is required" });
+  }
+
+  try {
+    const existing = await query("SELECT owner_id, photos FROM flats WHERE id = $1", [req.params.id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: "Flat not found" });
+    }
+    if (existing.rows[0].owner_id !== req.userId) {
+      return res.status(403).json({ error: "You can only remove photos from your own listing" });
+    }
+
+    const updated = (existing.rows[0].photos ?? []).filter((p) => p !== url);
+    const result = await query("UPDATE flats SET photos = $1 WHERE id = $2 RETURNING *", [updated, req.params.id]);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to remove photo" });
+  }
+});
+
 // GET /api/flats/:id/comments
 router.get("/:id/comments", async (req, res) => {
   try {

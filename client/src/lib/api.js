@@ -49,3 +49,20 @@ export async function patchJson(path, body) {
   }
   return res.json();
 }
+
+export async function deleteJson(path, body) {
+  const session = getStoredSession();
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody.error || `Request failed: ${res.status} ${res.statusText}`);
+  }
+  return res.json();
+}

@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
-import { CheckCircle2, Camera } from "lucide-react";
+import { CheckCircle2, Camera, X } from "lucide-react";
 import Modal from "./Modal.jsx";
 import { useNearbySeekers } from "../hooks/useNearbySeekers.js";
 import { useAddFlatPhotos } from "../hooks/useAddFlatPhotos.js";
+import { useRemoveFlatPhoto } from "../hooks/useRemoveFlatPhoto.js";
 
 const DEFAULT_SHARE_MESSAGE =
   "Just pinned my rental details anonymously on chitwan.rent 📍 It's Chitwan's first anonymous rent map — no brokers, no listings, just what people actually pay. Takes 20 seconds & no signup.";
@@ -19,6 +20,7 @@ function fileToDataUrl(file) {
 export default function ListFlatSuccessModal({ flat, onClose }) {
   const { data: nearbyData, isLoading: nearbyLoading } = useNearbySeekers(flat.lat, flat.lng, 3000);
   const addPhotos = useAddFlatPhotos(flat.id);
+  const removePhoto = useRemoveFlatPhoto(flat.id);
   const fileInputRef = useRef(null);
 
   const [photos, setPhotos] = useState(flat.photos ?? []);
@@ -37,6 +39,15 @@ export default function ListFlatSuccessModal({ flat, onClose }) {
       setPhotos(updated.photos ?? []);
     } catch {
       // error surfaced via addPhotos.isError below
+    }
+  };
+
+  const handleRemovePhoto = async (url) => {
+    try {
+      const updated = await removePhoto.mutateAsync(url);
+      setPhotos(updated.photos ?? []);
+    } catch {
+      // error surfaced via removePhoto.isError below
     }
   };
 
@@ -95,10 +106,22 @@ export default function ListFlatSuccessModal({ flat, onClose }) {
         {photos.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
             {photos.map((src, i) => (
-              <img key={i} src={src} alt="" className="h-14 w-14 rounded-lg object-cover" />
+              <div key={i} className="relative h-14 w-14">
+                <img src={src} alt="" className="h-14 w-14 rounded-lg object-cover" />
+                <button
+                  type="button"
+                  onClick={() => handleRemovePhoto(src)}
+                  disabled={removePhoto.isPending}
+                  aria-label="Remove photo"
+                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/80 text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <X size={11} />
+                </button>
+              </div>
             ))}
           </div>
         )}
+        {removePhoto.isError && <p className="mt-2 text-xs text-red-400">Couldn't remove photo — try again.</p>}
 
         <input
           ref={fileInputRef}
