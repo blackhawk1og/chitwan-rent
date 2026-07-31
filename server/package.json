@@ -23,7 +23,9 @@
     "add:flat-delete-code": "node db/add-flat-delete-code.js",
     "add:delete-attempts-table": "node db/add-delete-attempts-table.js",
     "add:flats-description": "node db/add-flats-description.js",
-    "add:flatmate-matching": "node db/add-flatmate-matching.js"
+    "add:flatmate-matching": "node db/add-flatmate-matching.js",
+    "add:digest-unsubscribe": "node db/add-digest-unsubscribe.js",
+    "add:next-digest-at": "node db/add-next-digest-at.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

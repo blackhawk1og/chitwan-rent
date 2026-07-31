@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { query } from "../db.js";
 import { requireAuth } from "../lib/auth.js";
+import { generateUnsubscribeToken } from "../lib/verification.js";
 
 const router = Router();
 
@@ -43,17 +44,23 @@ router.post("/", requireAuth, async (req, res) => {
       );
     }
 
+    // Seeker pins have no verification step (contrast routes/flats.js's
+    // pending_verification flow) — creation is the moment a pin becomes
+    // "active," so this is also the moment its digest schedule starts:
+    // first digest 12h from now, then every 7 days (see lib/digestJob.js),
+    // mirroring the flats-side rule set in verifyListingByToken exactly.
     const result = await query(
       `INSERT INTO seeker_pins
         (user_id, looking_for, budget, bhk_pref, move_in, food_pref, smoker_ok,
-         gender, flatmate_gender_pref, parking_required, lifestyle_note, email, phone, lat, lng, area)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+         gender, flatmate_gender_pref, parking_required, lifestyle_note, email, phone, lat, lng, area,
+         unsubscribe_token, next_digest_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,now() + interval '12 hours')
        RETURNING *`,
       [
         req.userId, looking_for, budget ?? null, bhk_pref ?? null, move_in ?? null,
         food_pref ?? null, smoker_ok ?? null, gender ?? null, flatmate_gender_pref ?? null,
         parking_required ?? false, lifestyle_note ?? null, email ?? null, phone ?? null,
-        lat, lng, area ?? null,
+        lat, lng, area ?? null, generateUnsubscribeToken(),
       ]
     );
     res.status(201).json(result.rows[0]);

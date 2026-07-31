@@ -13,8 +13,9 @@ import placesRouter from "./routes/places.js";
 import authRouter from "./routes/auth.js";
 import rentReportsRouter from "./routes/rentReports.js";
 import verifyListingRouter from "./routes/verifyListing.js";
+import unsubscribeRouter from "./routes/unsubscribe.js";
 import { startExpiredListingsCleanup } from "./lib/cleanupExpiredListings.js";
-import { startMatchingJob } from "./lib/matchingJob.js";
+import { startDigestJob } from "./lib/digestJob.js";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -53,10 +54,13 @@ app.use("/api/rent-reports", rentReportsRouter);
 // Not under /api — this is the literal link a browser navigates to from the
 // verification email (see lib/email.js), not a JSON endpoint the SPA calls.
 app.use("/verify-listing", verifyListingRouter);
+// Same reasoning — the literal link clicked from a weekly digest email
+// (see lib/email.js, lib/digestJob.js).
+app.use("/unsubscribe", unsubscribeRouter);
 
 app.listen(PORT, () => {
   console.log(`API server listening on http://localhost:${PORT}`);
 });
 
 startExpiredListingsCleanup();
-startMatchingJob();
+startDigestJob();
