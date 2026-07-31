@@ -49,6 +49,12 @@ function isWholeFlatType(flat, seeker) {
 // pairs — a whole-flat rental has no shared living space, so gender/food/
 // smoking compatibility doesn't apply to it.
 function isCompatible(flat, seeker) {
+  // Never match a user against their own listing/pin — compared by user id
+  // (flats.owner_id vs seeker_pins.user_id), the reliable identity, not
+  // email/phone strings, since either could theoretically resolve to the
+  // same person through a different field. Both can be null (e.g. no
+  // owner_id join match), in which case they're never treated as equal.
+  if (flat.owner_id != null && flat.owner_id === seeker.user_id) return false;
   if (!isRoomType(flat, seeker) && !isWholeFlatType(flat, seeker)) return false;
   if (seeker.bhk_pref && seeker.bhk_pref !== "any" && Number(seeker.bhk_pref) !== flat.bhk) return false;
   // "Budget ranges overlap" doesn't literally apply — both flats.rent and
