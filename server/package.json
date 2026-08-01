@@ -25,7 +25,8 @@
     "add:flats-description": "node db/add-flats-description.js",
     "add:flatmate-matching": "node db/add-flatmate-matching.js",
     "add:digest-unsubscribe": "node db/add-digest-unsubscribe.js",
-    "add:next-digest-at": "node db/add-next-digest-at.js"
+    "add:next-digest-at": "node db/add-next-digest-at.js",
+    "digest:run-now": "node db/run-digest-now.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
