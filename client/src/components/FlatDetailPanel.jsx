@@ -369,23 +369,13 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
             </>
           )}
 
-          {/* Seed/dummy listings show their fixed placeholder rating as plain
-              text — no click, no modal — since it's not a real community
-              rating and must never be overwritten (see is_seed guard in
-              POST /:id/rating). Real listings are the only ones that can
-              open the rating modal, and show nothing at all until a real
-              rating exists. */}
-          {isDummyListing ? (
-            <div className="mt-6 flex w-full items-center justify-between rounded-xl border border-white/10 bg-surface-alt px-4 py-3">
-              <span className="text-xs font-bold uppercase tracking-wide text-text-muted">Community Rating</span>
-              {displayedRating != null && (
-                <span className="flex items-center gap-2">
-                  <StarRatingDisplay value={displayedRating} />
-                  <span className="text-sm font-bold text-text-primary">{Number(displayedRating).toFixed(1)}</span>
-                </span>
-              )}
-            </div>
-          ) : (
+          {/* Seed/dummy listings never show a rating section at all — no
+              label, no star, no number — since their fixed placeholder
+              rating isn't a real community rating and must never be
+              overwritten (see is_seed guard in POST /:id/rating). Real
+              listings are the only ones that show this, and open the
+              rating modal on tap. */}
+          {!isDummyListing && (
             <button
               type="button"
               onClick={openRating}

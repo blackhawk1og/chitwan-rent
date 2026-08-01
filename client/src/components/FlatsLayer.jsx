@@ -76,7 +76,12 @@ export default function FlatsLayer({ flats, onSelect, onNearbyCluster }) {
           createFlatInfoChipIcon({
             bhk: flat.bhk,
             rent: flat.rent,
-            rating: flat.rating,
+            // Seed/dummy flats never show a rating on the marker either —
+            // same is_seed rule as FlatDetailPanel's Community Rating
+            // section. Passing null (rather than flat.rating) reuses
+            // createFlatInfoChipIcon's existing `rating != null` guard, no
+            // change needed there.
+            rating: flat.is_seed ? null : flat.rating,
             gated: flat.gated,
             listingType: flat.listing_type,
             sizeTier,

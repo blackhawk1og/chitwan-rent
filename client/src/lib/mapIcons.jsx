@@ -462,7 +462,7 @@ export function createFlatInfoChipIcon({ bhk, rent, rating, gated, listingType, 
         borderRadius: 9999,
         background,
         boxShadow: glowColor
-          ? `0 0 10px 1px ${glowColor}, 0 3px 10px rgba(0,0,0,0.45)`
+          ? `0 0 10px 3px ${glowColor}, 0 3px 10px rgba(0,0,0,0.45)`
           : "0 3px 10px rgba(0,0,0,0.45)",
         fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
         whiteSpace: "nowrap",
