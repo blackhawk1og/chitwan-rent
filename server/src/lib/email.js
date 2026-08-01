@@ -84,6 +84,69 @@ export async function sendVerificationEmail({ to, verifyUrl }) {
   });
 }
 
+// Same shell as verificationEmailHtml (purple header, same card), minus the
+// two things that don't apply to a seeker pin: no verify button (pins need
+// no click-through step at all — see routes/seekerPins.js) and no 24h-
+// deadline language. No dynamic/user-supplied text is interpolated here, so
+// unlike matchEmailHtml below there's nothing that needs escapeHtml.
+function seekerConfirmationEmailHtml() {
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background-color:#f4f4f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f7;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+            <tr>
+              <td style="background-color:${BRAND_PURPLE};padding:24px 32px;">
+                <span style="color:#ffffff;font-size:18px;font-weight:700;">Chitwan Rent</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px 32px 8px;">
+                <h1 style="margin:0 0 16px;font-size:20px;color:#111827;">Your search is live</h1>
+
+                <p style="margin:0 0 20px;font-size:13px;line-height:1.6;color:#4b5563;">
+                  Thank you for being part of this. You're one of the people who made Chitwan Rent real —
+                  by pinning your rent, listing a flat, dropping a seeker pin, or just watching an area.
+                  A quick, genuine thank-you. — Ashim (and the AI doing the actual work)
+                </p>
+
+                <p style="margin:0 0 4px;font-size:14px;line-height:1.6;color:#374151;">
+                  Your search is now active on the map. We'll email you automatically if a compatible flat
+                  turns up nearby — no need to keep checking back.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 32px 28px;">
+                <p style="margin:0;font-size:12px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:16px;">
+                  If you didn't create this search, you can safely ignore this email.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+// Fired once, right after a seeker pin is created (see POST /api/seeker-pins
+// in routes/seekerPins.js) — pins need no verification click-through, so
+// this is purely a confirmation, not a gate. Same throw-on-failure contract
+// as every other send*Email function here; the caller logs and continues
+// rather than failing pin creation over a bad send.
+export async function sendSeekerConfirmationEmail({ to }) {
+  await transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to,
+    subject: "Your search is live on Chitwan Rent",
+    html: seekerConfirmationEmailHtml(),
+  });
+}
+
 function deleteCodeEmailHtml({ flatId, code }) {
   return `<!doctype html>
 <html>

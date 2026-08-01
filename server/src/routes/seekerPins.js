@@ -2,6 +2,7 @@ import { Router } from "express";
 import { query } from "../db.js";
 import { requireAuth } from "../lib/auth.js";
 import { generateUnsubscribeToken } from "../lib/verification.js";
+import { sendSeekerConfirmationEmail } from "../lib/email.js";
 
 const router = Router();
 
@@ -63,7 +64,21 @@ router.post("/", requireAuth, async (req, res) => {
         lat, lng, area ?? null, generateUnsubscribeToken(),
       ]
     );
-    res.status(201).json(result.rows[0]);
+    const pin = result.rows[0];
+
+    if (email) {
+      try {
+        await sendSeekerConfirmationEmail({ to: email });
+        console.log(`Seeker confirmation email sent: seeker pin ${pin.id}`);
+      } catch (emailErr) {
+        // Same contract as every other email in this app — the pin is
+        // already created and live either way, so a failed send here never
+        // turns this response into a failure.
+        console.error(`Seeker confirmation email failed: seeker pin ${pin.id}`, emailErr.message);
+      }
+    }
+
+    res.status(201).json(pin);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to create seeker pin" });
