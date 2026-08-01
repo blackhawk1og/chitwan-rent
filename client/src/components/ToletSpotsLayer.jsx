@@ -11,7 +11,7 @@ export default function ToletSpotsLayer({ spots }) {
         <Marker key={spot.id} position={[spot.lat, spot.lng]} icon={toletIcon}>
           <Popup>
             <div className="text-sm">
-              <div className="font-bold">{spot.name || "A rental hero"}</div>
+              <div className="font-bold">{spot.hero_nickname || "A Rental Hero"}</div>
               {spot.message && <div className="mt-1 text-gray-600">{spot.message}</div>}
             </div>
           </Popup>

@@ -99,8 +99,8 @@ async function seedUsers() {
     const name = randomName();
     const heroPoints = heroPointsShape[i];
     const res = await pool.query(
-      `INSERT INTO users (name, phone, email, role, hero_points)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      `INSERT INTO users (name, phone, email, role, hero_points, is_seed)
+       VALUES ($1, $2, $3, $4, $5, true) RETURNING id`,
       [
         name,
         randomPhone(),

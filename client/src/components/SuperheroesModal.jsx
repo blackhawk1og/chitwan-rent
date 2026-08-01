@@ -46,7 +46,7 @@ export default function SuperheroesModal({ onClose, onSpotToLet }) {
             <div key={hero.id} className="flex items-center gap-3 border-b border-white/5 py-3 last:border-0">
               <RankBadge rank={i} />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-bold text-text-primary">{hero.name || "A rental hero"}</div>
+                <div className="truncate text-sm font-bold text-text-primary">{hero.hero_nickname || "A Rental Hero"}</div>
                 {i === 0 && hero.sample_message && (
                   <p className="mt-0.5 truncate text-xs italic text-text-muted">"{hero.sample_message}"</p>
                 )}

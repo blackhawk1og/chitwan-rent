@@ -102,7 +102,7 @@ export default function SpotToLetModal({
       <div className="mt-4 space-y-3">
         <input
           type="text"
-          placeholder="Your name (optional)"
+          placeholder="Pick a nickname (shown instead of your name)"
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
           className="w-full rounded-xl border border-white/10 bg-surface-alt px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none"

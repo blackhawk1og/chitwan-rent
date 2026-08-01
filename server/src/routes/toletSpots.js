@@ -4,10 +4,19 @@ import { requireAuth } from "../lib/auth.js";
 
 const router = Router();
 
-// GET /api/tolet-spots
+// GET /api/tolet-spots — joins in the spotter's self-chosen hero_nickname
+// (not users.name — see routes/superheroes.js) so ToletSpotsLayer.jsx never
+// needs to show a real identity field. tolet_spots.name (the old
+// per-submission "your name" value) is still stored on each row but no
+// longer read for display.
 router.get("/", async (req, res) => {
   try {
-    const result = await query("SELECT * FROM tolet_spots ORDER BY created_at DESC");
+    const result = await query(
+      `SELECT t.*, u.hero_nickname
+       FROM tolet_spots t
+       LEFT JOIN users u ON u.id = t.spotter_id
+       ORDER BY t.created_at DESC`
+    );
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -19,8 +28,13 @@ router.post("/", requireAuth, async (req, res) => {
   const { photo_url, name, message, lat, lng } = req.body;
 
   try {
+    // `name` here is really "nickname" now (see SpotToLetModal.jsx's
+    // relabeled input) — set once and never overwritten by a later
+    // submission (COALESCE), same protective pattern the old users.name
+    // update used. It intentionally no longer touches users.name at all:
+    // writing a chosen nickname into the real-name field would corrupt it.
     if (name) {
-      await query("UPDATE users SET name = COALESCE(name, $1) WHERE id = $2", [name, req.userId]);
+      await query("UPDATE users SET hero_nickname = COALESCE(hero_nickname, $1) WHERE id = $2", [name, req.userId]);
     }
 
     const result = await query(

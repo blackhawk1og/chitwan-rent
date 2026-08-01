@@ -5,12 +5,15 @@ const router = Router();
 
 // GET /api/superheroes — ranked leaderboard. hero_points is incremented
 // 1:1 with to-let spots, so it doubles as the "spots" count directly.
+// Real name (users.name) is never returned here — only the self-chosen,
+// optional hero_nickname (see routes/toletSpots.js for where it's set);
+// the client falls back to "A Rental Hero" when it's null.
 router.get("/", async (req, res) => {
   try {
     const result = await query(
       `SELECT
         u.id,
-        u.name,
+        u.hero_nickname,
         u.hero_points AS spots,
         (
           SELECT message FROM tolet_spots
@@ -19,7 +22,7 @@ router.get("/", async (req, res) => {
           LIMIT 1
         ) AS sample_message
       FROM users u
-      WHERE u.hero_points > 0
+      WHERE u.hero_points > 0 AND u.is_seed = false
       ORDER BY u.hero_points DESC, u.id ASC`
     );
     res.json(result.rows);
