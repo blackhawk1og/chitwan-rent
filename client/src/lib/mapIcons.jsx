@@ -357,31 +357,94 @@ const GATED_CHIP_BG = {
   not_gated: "#f59e0b",
 };
 
+// Soft ambient glow around the chip, same color as its own background —
+// a low-opacity, wide-blur, low-spread box-shadow layer stacked alongside
+// the chip's existing drop shadow (cheap, GPU-friendly, same technique
+// already used everywhere else in this file — no filter/blur elements).
+// No entry for the neutral/unset-gated fallback: there's no real color to
+// glow with there, so that case just keeps its plain drop shadow.
+const GATED_GLOW_COLOR = {
+  gated: "rgba(59,130,246,0.45)",
+  not_gated: "rgba(245,158,11,0.45)",
+};
+
 // Sizing presets for createFlatInfoChipIcon. "base" is the resting compact
 // style shown as soon as individual (unclustered) chips appear; "compact"
 // and "tight" shrink it further as the user zooms in past the thresholds in
 // FlatsLayer's FLAT_CHIP_ZOOM_SCALE, so dense close-up views stay tidy
-// instead of every chip staying full-size.
+// instead of every chip staying full-size. chipHeight is an estimate (2×padY
+// + fontSize×~1.2 line-height + borders, rounded up a couple px for safety)
+// used only to position iconAnchor at the tail's tip — not measured from the
+// real rendered DOM, same "close enough" spirit as the rest of this file's
+// hand-tuned anchor values.
 const CHIP_SIZE_STYLES = {
-  base: { padY: 4, padX: 8, gap: 5, fontSize: 10, dividerH: 10, anchorX: 44, anchorY: 11 },
-  compact: { padY: 3.5, padX: 7, gap: 4, fontSize: 9.5, dividerH: 9, anchorX: 40, anchorY: 10 },
-  tight: { padY: 3, padX: 6, gap: 4, fontSize: 9, dividerH: 8, anchorX: 36, anchorY: 9 },
+  base: { padY: 4, padX: 8, gap: 5, fontSize: 10, dividerH: 10, anchorX: 44, chipHeight: 22 },
+  compact: { padY: 3.5, padX: 7, gap: 4, fontSize: 9.5, dividerH: 9, anchorX: 40, chipHeight: 20 },
+  tight: { padY: 3, padX: 6, gap: 4, fontSize: 9, dividerH: 8, anchorX: 36, chipHeight: 18 },
 };
 
-// Small red pill stacked above a reported flat's chip — see createFlatInfoChipIcon.
-const REPORT_BADGE_HEIGHT_PX = 20;
-const REPORT_BADGE_GAP_PX = 4;
+// Small pill stacked above the chip — shared style for both the red "N
+// report(s)" badge and the green "WHOLE AVBL"/"ROOM AVBL" availability
+// badge (see createFlatInfoChipIcon). Only the text/background differ.
+// Sized as a compact label, deliberately smaller than the price/BHK chip
+// text below it so it doesn't visually compete with it.
+function badgePill(text, background, fontSize) {
+  return (
+    <span
+      style={{
+        fontSize: Math.max(fontSize - 2, 7),
+        fontWeight: 800,
+        color: "#ffffff",
+        background,
+        padding: "1px 6px",
+        borderRadius: 9999,
+        border: "1px solid rgba(255,255,255,0.25)",
+        boxShadow: "0 2px 6px rgba(0,0,0,0.5)",
+        whiteSpace: "nowrap",
+        fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+      }}
+    >
+      {text}
+    </span>
+  );
+}
 
-// Compact info chip for an individual flat pin: "3BHK · 29.2K · ★ 4.0" in one row.
-// When reportCount > 0, a small red "N report(s)" pill stacks directly above
-// the chip — baked into the same divIcon (rather than a second Marker) so it
-// always moves/z-orders together with the chip it belongs to. The extra
-// height only shifts iconAnchor, not the chip's own layout, so the chip
-// itself is pixel-identical to the no-reports case.
-export function createFlatInfoChipIcon({ bhk, rent, rating, gated, sizeTier = "base", reportCount = 0 }) {
+const REPORT_BADGE_COLOR = "#dc2626";
+const AVAILABILITY_BADGE_COLOR = "#22c55e"; // same success-green used elsewhere (ListFlatSuccessModal, DeleteFlatPage)
+const BADGE_HEIGHT_PX = 14; // matches the smaller padding/font-size above
+// Gap between the two badges themselves (report + availability, when both
+// are stacked) and between the bottom-most badge and the price/BHK chip
+// beneath it — kept equal so the whole stack reads as evenly spaced.
+const BADGE_GAP_PX = 1;
+const BADGE_TO_CHIP_GAP_PX = 1;
+// Bottom pointer — same three-border-triangle technique as createYourPinIcon's
+// tail, just attached directly under this chip instead of a separate marker,
+// so the pin now points at its exact coordinate instead of floating with no
+// anchor reference.
+const TAIL_HEIGHT_PX = 6;
+
+// listing_type's only two stored values (see schema.sql's CHECK constraint) —
+// 'flat' is a whole-unit rental, 'flatmate' is a room/flatmate listing. Any
+// other/missing value defaults to the whole-flat badge, same default the
+// column itself uses ('flat').
+function availabilityBadgeLabel(listingType) {
+  return listingType === "flatmate" ? "ROOM AVBL" : "WHOLE AVBL";
+}
+
+// Compact info chip for an individual flat pin: "3BHK · 29.2K · ★ 4.0" in one
+// row, shaped as a teardrop pin (rounded chip + a small pointed tail) so it
+// visually points at its exact map coordinate, matching createYourPinIcon's
+// established pin style rather than a plain floating chip. Above the chip,
+// up to two small pills can stack (report count in red, then the
+// listing-type availability badge in green) — baked into the same divIcon
+// (rather than separate Markers) so everything always moves/z-orders
+// together. The extra height only shifts iconAnchor, not the chip/tail's own
+// layout.
+export function createFlatInfoChipIcon({ bhk, rent, rating, gated, listingType, sizeTier = "base", reportCount = 0 }) {
   const bhkLabel = bhk >= 5 ? "5+" : bhk;
   const priceLabel = `${(rent / 1000).toFixed(1)}K`;
   const background = GATED_CHIP_BG[gated] ?? "rgba(17,18,32,0.96)";
+  const glowColor = GATED_GLOW_COLOR[gated];
   const s = CHIP_SIZE_STYLES[sizeTier] ?? CHIP_SIZE_STYLES.base;
   const hasReports = reportCount > 0;
 
@@ -398,8 +461,9 @@ export function createFlatInfoChipIcon({ bhk, rent, rating, gated, sizeTier = "b
         padding: `${s.padY}px ${s.padX}px`,
         borderRadius: 9999,
         background,
-        border: "1px solid rgba(255,255,255,0.12)",
-        boxShadow: "0 3px 10px rgba(0,0,0,0.45)",
+        boxShadow: glowColor
+          ? `0 0 10px 1px ${glowColor}, 0 3px 10px rgba(0,0,0,0.45)`
+          : "0 3px 10px rgba(0,0,0,0.45)",
         fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
         whiteSpace: "nowrap",
       }}
@@ -416,37 +480,70 @@ export function createFlatInfoChipIcon({ bhk, rent, rating, gated, sizeTier = "b
     </div>
   );
 
-  const html = renderToStaticMarkup(
-    hasReports ? (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: REPORT_BADGE_GAP_PX }}>
-        <span
-          style={{
-            fontSize: Math.max(s.fontSize - 0.5, 8),
-            fontWeight: 800,
-            color: "#ffffff",
-            background: "#dc2626",
-            padding: "2px 8px",
-            borderRadius: 9999,
-            border: "1px solid rgba(255,255,255,0.25)",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.5)",
-            whiteSpace: "nowrap",
-            fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
-          }}
-        >
-          {reportCount} report{reportCount === 1 ? "" : "s"}
-        </span>
-        {chip}
-      </div>
-    ) : (
-      chip
-    )
+  // Colored to match the chip so the two read as one continuous pin shape
+  // rather than a chip with a separate decoration under it. No shadow of
+  // its own — a second, independently-cast shadow is exactly what made
+  // this read as a tail stuck onto the chip rather than one shape;
+  // createYourPinIcon's tail (the established precedent for this pin
+  // style) is shadow-less for the same reason, relying only on the chip's
+  // own boxShadow above it. Pulled up 1px (negative margin) to overlap the
+  // chip's bottom edge rather than sit exactly flush against it — a 0px
+  // seam between a border-triangle and a rounded-rect fill still shows a
+  // hairline gap in real browsers (anti-aliasing on the triangle's
+  // diagonal edges vs. the fill, worsened by Leaflet rendering markers
+  // inside a scaled/transformed layer); a 1px overlap hides that seam
+  // entirely without changing the tail's visible height/shape.
+  const tail = (
+    <div
+      style={{
+        width: 0,
+        height: 0,
+        marginTop: -1,
+        borderLeft: "6px solid transparent",
+        borderRight: "6px solid transparent",
+        borderTop: `${TAIL_HEIGHT_PX}px solid ${background}`,
+      }}
+    />
   );
+
+  const badges = [];
+  if (hasReports) badges.push(badgePill(`${reportCount} report${reportCount === 1 ? "" : "s"}`, REPORT_BADGE_COLOR, s.fontSize));
+  badges.push(badgePill(availabilityBadgeLabel(listingType), AVAILABILITY_BADGE_COLOR, s.fontSize));
+
+  const html = renderToStaticMarkup(
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: BADGE_GAP_PX,
+          marginBottom: BADGE_TO_CHIP_GAP_PX,
+        }}
+      >
+        {badges}
+      </div>
+      {chip}
+      {tail}
+    </div>
+  );
+
+  // badges.length badge heights, (badges.length - 1) inter-badge gaps, plus
+  // one badge-to-chip gap at the end (see BADGE_TO_CHIP_GAP_PX above).
+  const stackHeight =
+    s.chipHeight +
+    badges.length * BADGE_HEIGHT_PX +
+    Math.max(badges.length - 1, 0) * BADGE_GAP_PX +
+    BADGE_TO_CHIP_GAP_PX;
 
   return L.divIcon({
     html,
     className: "chitwan-pin-icon",
     iconSize: null,
-    iconAnchor: [s.anchorX, hasReports ? s.anchorY + REPORT_BADGE_HEIGHT_PX + REPORT_BADGE_GAP_PX : s.anchorY],
+    // Anchors at the tail's tip — the point that actually corresponds to
+    // the flat's lat/lng — not the chip's center like before. -1 to match
+    // the tail's own -1px overlap (see the tail's marginTop above).
+    iconAnchor: [s.anchorX, stackHeight + TAIL_HEIGHT_PX - 1],
   });
 }
 

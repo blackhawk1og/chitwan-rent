@@ -78,6 +78,7 @@ export default function FlatsLayer({ flats, onSelect, onNearbyCluster }) {
             rent: flat.rent,
             rating: flat.rating,
             gated: flat.gated,
+            listingType: flat.listing_type,
             sizeTier,
             reportCount: flat.report_count,
           }),
