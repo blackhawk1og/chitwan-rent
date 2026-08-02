@@ -428,3 +428,159 @@ export async function sendSeekerMatchDigest({ to, seekerName, seeker, matches, u
     }),
   });
 }
+
+// --- Combined multi-section digest (multiple due rows, same email) ---
+//
+// Used only when digestJob.js's grouping finds more than one due row (flat
+// and/or seeker pin) sharing the same email in a single run — a single due
+// row still goes through sendFlatMatchDigest/sendSeekerMatchDigest above,
+// unchanged. Built as separate functions rather than parametrizing
+// digestShellHtml/sendFlatMatchDigest/sendSeekerMatchDigest so the existing
+// single-row email's output can't be affected by this addition.
+
+// Per-section unsubscribe line — deliberately NOT the shared digestFooterHtml
+// used by the single-row emails, since a combined email must let someone
+// unsubscribe just ONE of their listings/searches without touching the
+// others (their unsubscribe tokens are never merged).
+function sectionUnsubscribeHtml(unsubscribeUrl, itemLabel) {
+  return `
+    <p style="margin:0 0 20px;font-size:12px;color:#9ca3af;">
+      Done with this ${escapeHtml(itemLabel)}? <a href="${unsubscribeUrl}" style="color:#7c3aed;">Unsubscribe just this one</a> — your other items above stay active.
+    </p>`;
+}
+
+function sectionDividerHtml() {
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+      <tr><td style="border-top:1px solid #e5e7eb;line-height:0;font-size:0;">&nbsp;</td></tr>
+    </table>`;
+}
+
+function flatSectionHtml({ flat, matches, unsubscribeUrl }) {
+  const recapHtml = recapBoxHtml(
+    "Your listing",
+    `${escapeHtml(formatListingType(flat.listing_type))} &middot; ${escapeHtml(formatRs(flat.rent))}/mo &middot; ${escapeHtml(formatBhk(flat.bhk))} &middot; ${escapeHtml(flat.area || "Area not set")}`
+  );
+  const matchesHtml = matches
+    .map(({ seeker }) =>
+      matchCardHtml({
+        typeLabel: formatLookingFor(seeker.looking_for),
+        budget: `Budget ${formatRs(seeker.budget)}/mo`,
+        bhk: formatBhk(seeker.bhk_pref),
+        moveIn: formatMoveIn(seeker.move_in),
+        email: seeker.email,
+        phone: seeker.phone,
+      })
+    )
+    .join("");
+  return recapHtml + matchesHtml + sectionUnsubscribeHtml(unsubscribeUrl, "listing");
+}
+
+function seekerSectionHtml({ seeker, matches, unsubscribeUrl }) {
+  const recapHtml = recapBoxHtml(
+    "Your search",
+    `${escapeHtml(formatLookingFor(seeker.looking_for))} &middot; Budget ${escapeHtml(formatRs(seeker.budget))}/mo &middot; ${escapeHtml(formatBhk(seeker.bhk_pref))} &middot; ${escapeHtml(seeker.area || "Area not set")}`
+  );
+  const matchesHtml = matches
+    .map(({ flat }) =>
+      matchCardHtml({
+        typeLabel: formatListingType(flat.listing_type),
+        budget: `${formatRs(flat.rent)}/mo`,
+        bhk: formatBhk(flat.bhk),
+        moveIn: formatMoveIn(flat.available_from),
+        email: flat.owner_email,
+        phone: flat.owner_phone,
+      })
+    )
+    .join("");
+  return recapHtml + matchesHtml + sectionUnsubscribeHtml(unsubscribeUrl, "search");
+}
+
+// Footer for the combined shell only — no single shared unsubscribe link
+// (each section already has its own above), just the optional reply-to note
+// and the standard "ignore if irrelevant" line.
+function digestMultiFooterHtml() {
+  const replyLine = process.env.DIGEST_REPLY_TO
+    ? `<p style="margin:0 0 4px;font-size:12px;color:#9ca3af;">Reply to this email and it reaches ${escapeHtml(process.env.DIGEST_REPLY_TO)} directly.</p>`
+    : "";
+  return `
+    ${replyLine}
+    <p style="margin:0;font-size:12px;color:#9ca3af;">
+      Each item above repeats weekly on its own schedule for as long as it stays up — use that item's own
+      unsubscribe link above if you want to stop just one.
+    </p>`;
+}
+
+function digestShellMultiHtml({ heading, summaryLine, sectionsHtml }) {
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background-color:#f4f4f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f7;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+            <tr>
+              <td style="background-color:${BRAND_PURPLE};padding:24px 32px;">
+                <span style="color:#ffffff;font-size:18px;font-weight:700;">Chitwan Rent</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px 32px 8px;">
+                <h1 style="margin:0 0 16px;font-size:20px;color:#111827;">${escapeHtml(heading)}</h1>
+
+                <p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:#374151;">
+                  ${escapeHtml(summaryLine)} There's no in-app messaging on Chitwan Rent — this weekly email is
+                  the only way matches get connected, so reach out directly using the contacts below.
+                </p>
+
+                ${sectionsHtml}
+                ${digestMultiFooterHtml()}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 32px 28px;">
+                <p style="margin:0;font-size:12px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:16px;">
+                  If this doesn't seem relevant to you, you can safely ignore this email.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+// Sent instead of sendFlatMatchDigest/sendSeekerMatchDigest when one email
+// address owns more than one due row (flat and/or seeker pin, in any mix)
+// in the same digest run — see lib/digestJob.js's grouping in runDigestJob().
+// One email, one labeled section per row (each section's own recap +
+// matches + own unsubscribe link, never merged), instead of separate emails.
+export async function sendCombinedDigest({ to, sections }) {
+  const sectionsHtml = sections
+    .map((section, index) => {
+      const body =
+        section.kind === "flat"
+          ? flatSectionHtml(section)
+          : seekerSectionHtml(section);
+      return index < sections.length - 1 ? body + sectionDividerHtml() : body;
+    })
+    .join("");
+
+  const totalMatches = sections.reduce((sum, section) => sum + section.matches.length, 0);
+  const firstNamed = sections.find((section) => section.ownerName || section.seekerName);
+  const greeting = firstNamed ? `Hi ${firstNamed.ownerName || firstNamed.seekerName}, we` : "We";
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to,
+    ...(process.env.DIGEST_REPLY_TO ? { replyTo: process.env.DIGEST_REPLY_TO } : {}),
+    subject: "This week's Chitwan Rent digest",
+    html: digestShellMultiHtml({
+      heading: `Your Chitwan Rent digest — ${sections.length} active items`,
+      summaryLine: `${greeting} found ${totalMatches} match${totalMatches === 1 ? "" : "es"} across the ${sections.length} active items below within 2km.`,
+      sectionsHtml,
+    }),
+  });
+}

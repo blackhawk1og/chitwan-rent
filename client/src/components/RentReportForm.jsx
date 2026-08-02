@@ -35,6 +35,7 @@ export default function RentReportForm({ onCancel, onSubmit, submitting, submitE
           placeholder="e.g. 15000"
           value={rent}
           onChange={(e) => setRent(e.target.value)}
+          onWheel={(e) => e.target.blur()}
         />
 
         <div>

@@ -1,6 +1,6 @@
 import { query } from "../db.js";
 import { haversineDistanceMeters } from "./geo.js";
-import { sendFlatMatchDigest, sendSeekerMatchDigest } from "./email.js";
+import { sendFlatMatchDigest, sendSeekerMatchDigest, sendCombinedDigest } from "./email.js";
 
 const MATCH_RADIUS_METERS = 2000;
 
@@ -132,6 +132,15 @@ function findCompatible(subject, pool, subjectIsFlat) {
 // active yesterday and isn't due again for days. Due-ness is checked in SQL
 // (not by pulling everything and filtering in JS) so it can't drift from
 // the DB's own clock.
+//
+// Sending is a separate step from matching/scheduling below: every due row
+// still gets its own matches computed and its own next_digest_at advanced
+// exactly as before, regardless of how it ends up being sent. Rows are only
+// grouped by email at the very end, right before dispatch, so that a person
+// who owns more than one due row (flat and/or seeker pin) under the same
+// email gets ONE email with one labeled section per row instead of one email
+// per row — see email.js's sendCombinedDigest. A row's own schedule/matches
+// never depend on what else happens to be due for the same email this run.
 export async function runDigestJob() {
   const dueFlatsResult = await query(`${ACTIVE_FLATS_SQL} AND f.next_digest_at <= now()`);
   const dueSeekersResult = await query(`${ACTIVE_SEEKERS_SQL} AND sp.next_digest_at <= now()`);
@@ -145,6 +154,14 @@ export async function runDigestJob() {
 
   let flatDigestsSent = 0;
   let flatDigestsSkipped = 0;
+  let seekerDigestsSent = 0;
+  let seekerDigestsSkipped = 0;
+
+  // Rows due AND with at least one current match, keyed by the email that
+  // will receive them — populated by the two loops below, sent after both
+  // loops finish. A due row with zero matches is still skipped-not-sent
+  // (same rule as before) and never enters this map.
+  const rowsByEmail = new Map();
 
   for (const flat of dueFlats) {
     const matches = findCompatible(flat, allSeekers, true);
@@ -158,19 +175,16 @@ export async function runDigestJob() {
     // re-evaluated every hour forever. See this feature's assumptions
     // writeup for this choice.
     if (capped.length > 0 && flat.owner_email) {
-      try {
-        await sendFlatMatchDigest({
-          to: flat.owner_email,
-          ownerName: flat.owner_name,
-          flat,
-          matches: capped,
-          unsubscribeUrl: `${SERVER_BASE_URL}/unsubscribe?token=${flat.unsubscribe_token}`,
-        });
-        flatDigestsSent++;
-        console.log(`Flat digest sent: flat ${flat.id} (${capped.length} of ${matches.length} matches)`);
-      } catch (err) {
-        console.error(`Flat digest failed: flat ${flat.id}`, err.message);
-      }
+      const list = rowsByEmail.get(flat.owner_email) ?? [];
+      list.push({
+        kind: "flat",
+        flat,
+        matches: capped,
+        matchCount: matches.length,
+        ownerName: flat.owner_name,
+        unsubscribeUrl: `${SERVER_BASE_URL}/unsubscribe?token=${flat.unsubscribe_token}`,
+      });
+      rowsByEmail.set(flat.owner_email, list);
     } else {
       flatDigestsSkipped++;
       console.log(`Flat digest skipped (no matches yet): flat ${flat.id}`);
@@ -183,28 +197,22 @@ export async function runDigestJob() {
     }
   }
 
-  let seekerDigestsSent = 0;
-  let seekerDigestsSkipped = 0;
-
   for (const seeker of dueSeekers) {
     const matches = findCompatible(seeker, allFlats, false);
     const capped = matches.slice(0, DIGEST_MATCH_CAP);
     for (const { flat } of matches) await logMatchSeen(flat.id, seeker.id);
 
     if (capped.length > 0 && seeker.email) {
-      try {
-        await sendSeekerMatchDigest({
-          to: seeker.email,
-          seekerName: seeker.seeker_name,
-          seeker,
-          matches: capped,
-          unsubscribeUrl: `${SERVER_BASE_URL}/unsubscribe?token=${seeker.unsubscribe_token}`,
-        });
-        seekerDigestsSent++;
-        console.log(`Seeker digest sent: seeker pin ${seeker.id} (${capped.length} of ${matches.length} matches)`);
-      } catch (err) {
-        console.error(`Seeker digest failed: seeker pin ${seeker.id}`, err.message);
-      }
+      const list = rowsByEmail.get(seeker.email) ?? [];
+      list.push({
+        kind: "seeker",
+        seeker,
+        matches: capped,
+        matchCount: matches.length,
+        seekerName: seeker.seeker_name,
+        unsubscribeUrl: `${SERVER_BASE_URL}/unsubscribe?token=${seeker.unsubscribe_token}`,
+      });
+      rowsByEmail.set(seeker.email, list);
     } else {
       seekerDigestsSkipped++;
       console.log(`Seeker digest skipped (no matches yet): seeker pin ${seeker.id}`);
@@ -214,6 +222,57 @@ export async function runDigestJob() {
       await query(`UPDATE seeker_pins SET next_digest_at = now() + interval '7 days' WHERE id = $1`, [seeker.id]);
     } catch (err) {
       console.error(`Failed to reschedule next_digest_at: seeker pin ${seeker.id}`, err.message);
+    }
+  }
+
+  // Dispatch: one row alone under its email sends exactly as it did before
+  // (sendFlatMatchDigest/sendSeekerMatchDigest, unchanged). Two or more rows
+  // sharing an email go out as a single sendCombinedDigest call instead of
+  // N separate sends.
+  for (const [email, rows] of rowsByEmail) {
+    if (rows.length === 1) {
+      const row = rows[0];
+      try {
+        if (row.kind === "flat") {
+          await sendFlatMatchDigest({
+            to: email,
+            ownerName: row.ownerName,
+            flat: row.flat,
+            matches: row.matches,
+            unsubscribeUrl: row.unsubscribeUrl,
+          });
+          flatDigestsSent++;
+          console.log(`Flat digest sent: flat ${row.flat.id} (${row.matches.length} of ${row.matchCount} matches)`);
+        } else {
+          await sendSeekerMatchDigest({
+            to: email,
+            seekerName: row.seekerName,
+            seeker: row.seeker,
+            matches: row.matches,
+            unsubscribeUrl: row.unsubscribeUrl,
+          });
+          seekerDigestsSent++;
+          console.log(`Seeker digest sent: seeker pin ${row.seeker.id} (${row.matches.length} of ${row.matchCount} matches)`);
+        }
+      } catch (err) {
+        console.error(`Digest failed: ${email}`, err.message);
+      }
+      continue;
+    }
+
+    try {
+      await sendCombinedDigest({ to: email, sections: rows });
+      for (const row of rows) {
+        if (row.kind === "flat") {
+          flatDigestsSent++;
+          console.log(`Flat digest sent (combined with ${rows.length - 1} other item(s)): flat ${row.flat.id} (${row.matches.length} of ${row.matchCount} matches)`);
+        } else {
+          seekerDigestsSent++;
+          console.log(`Seeker digest sent (combined with ${rows.length - 1} other item(s)): seeker pin ${row.seeker.id} (${row.matches.length} of ${row.matchCount} matches)`);
+        }
+      }
+    } catch (err) {
+      console.error(`Combined digest failed: ${email} (${rows.length} items)`, err.message);
     }
   }
 

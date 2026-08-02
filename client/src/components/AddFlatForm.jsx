@@ -85,6 +85,7 @@ export default function AddFlatForm({ onCancel, onSubmit, submitting, submitErro
             placeholder="e.g. 12000"
             value={form.rent}
             onChange={(e) => set({ rent: e.target.value })}
+            onWheel={(e) => e.target.blur()}
           />
 
           <div>

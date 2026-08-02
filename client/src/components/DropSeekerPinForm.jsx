@@ -108,6 +108,7 @@ export default function DropSeekerPinForm({ lat, lng, onCancel, onSubmit, submit
               placeholder="e.g. 8000"
               value={form.budget}
               onChange={(e) => set({ budget: e.target.value })}
+              onWheel={(e) => e.target.blur()}
             />
             <div className="mt-2">
               <NearbyRentLine lat={lat} lng={lng} />
