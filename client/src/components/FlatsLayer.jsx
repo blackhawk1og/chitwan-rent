@@ -86,6 +86,7 @@ export default function FlatsLayer({ flats, onSelect, onNearbyCluster }) {
             listingType: flat.listing_type,
             sizeTier,
             reportCount: flat.report_count,
+            isSeed: flat.is_seed,
           }),
         ])
       ),

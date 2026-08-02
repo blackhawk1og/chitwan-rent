@@ -1,5 +1,26 @@
 const EARTH_RADIUS_M = 6371000;
 
+// Mirrors client/src/lib/mapConfig.js's CHITWAN_BOUNDS ([[27.45, 84.15],
+// [27.8, 84.65]]) — that's the client's single source of truth for this
+// district's extent; duplicated here in plain lat/lng min/max form since
+// the server has no module path to the client's constant. Keep in sync if
+// CHITWAN_BOUNDS ever changes.
+const CHITWAN_LAT_MIN = 27.45;
+const CHITWAN_LAT_MAX = 27.8;
+const CHITWAN_LNG_MIN = 84.15;
+const CHITWAN_LNG_MAX = 84.65;
+
+export function isWithinChitwanBounds(lat, lng) {
+  return (
+    typeof lat === "number" &&
+    typeof lng === "number" &&
+    lat >= CHITWAN_LAT_MIN &&
+    lat <= CHITWAN_LAT_MAX &&
+    lng >= CHITWAN_LNG_MIN &&
+    lng <= CHITWAN_LNG_MAX
+  );
+}
+
 export function haversineDistanceMeters(lat1, lng1, lat2, lng2) {
   const toRad = (d) => (d * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);

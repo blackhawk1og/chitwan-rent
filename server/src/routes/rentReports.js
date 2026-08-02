@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { query } from "../db.js";
+import { isWithinChitwanBounds } from "../lib/geo.js";
 
 const router = Router();
 
@@ -31,6 +32,9 @@ router.post("/", async (req, res) => {
   }
   if (typeof lat !== "number" || typeof lng !== "number") {
     return res.status(400).json({ error: "lat and lng are required" });
+  }
+  if (!isWithinChitwanBounds(lat, lng)) {
+    return res.status(400).json({ error: "Location must be within Chitwan district" });
   }
 
   try {

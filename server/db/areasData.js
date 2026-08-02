@@ -17,6 +17,6 @@ export const AREAS = [
   { name: "Bagauda", lat: 27.695, lng: 84.45, weight: 3 },
   { name: "Kalika", lat: 27.56, lng: 84.25, weight: 2 },
   { name: "Rapti", lat: 27.63, lng: 84.28, weight: 2 },
-  { name: "Shaktikhor", lat: 27.72, lng: 84.2, weight: 1 },
-  { name: "Ichchhakamana", lat: 27.65, lng: 84.15, weight: 1 },
+  { name: "Shaktikhor", lat: 27.73, lng: 84.59, weight: 1 }, // was lng 84.2 — wrongly placed near Chitwan's western Nawalpur border; real Shaktikhor is in the northeast, near Jutpani/Kalika (27°44'N 84°35'E)
+  { name: "Ichchhakamana", lat: 27.65, lng: 84.2, weight: 1 }, // was 84.15 — sat exactly on CHITWAN_BOUNDS' western edge, so seed.js's jitter (see mapConfig.js) pushed ~half its flats out of bounds
 ];

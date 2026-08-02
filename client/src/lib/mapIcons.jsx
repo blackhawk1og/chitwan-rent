@@ -440,7 +440,7 @@ function availabilityBadgeLabel(listingType) {
 // (rather than separate Markers) so everything always moves/z-orders
 // together. The extra height only shifts iconAnchor, not the chip/tail's own
 // layout.
-export function createFlatInfoChipIcon({ bhk, rent, rating, gated, listingType, sizeTier = "base", reportCount = 0 }) {
+export function createFlatInfoChipIcon({ bhk, rent, rating, gated, listingType, sizeTier = "base", reportCount = 0, isSeed = false }) {
   const bhkLabel = bhk >= 5 ? "5+" : bhk;
   const priceLabel = `${(rent / 1000).toFixed(1)}K`;
   const background = GATED_CHIP_BG[gated] ?? "rgba(17,18,32,0.96)";
@@ -508,7 +508,10 @@ export function createFlatInfoChipIcon({ bhk, rent, rating, gated, listingType, 
 
   const badges = [];
   if (hasReports) badges.push(badgePill(`${reportCount} report${reportCount === 1 ? "" : "s"}`, REPORT_BADGE_COLOR, s.fontSize));
-  badges.push(badgePill(availabilityBadgeLabel(listingType), AVAILABILITY_BADGE_COLOR, s.fontSize));
+  // Seed/dummy flats aren't real availability, so they never get the
+  // WHOLE AVBL / ROOM AVBL badge — same is_seed rule already applied to the
+  // rating (see FlatsLayer.jsx) and to FlatDetailPanel's rating section.
+  if (!isSeed) badges.push(badgePill(availabilityBadgeLabel(listingType), AVAILABILITY_BADGE_COLOR, s.fontSize));
 
   const html = renderToStaticMarkup(
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>

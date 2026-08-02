@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { query } from "../db.js";
-import { isNearAnyRoute } from "../lib/geo.js";
+import { isNearAnyRoute, isWithinChitwanBounds } from "../lib/geo.js";
 import { requireAuth } from "../lib/auth.js";
 import { generateVerificationToken } from "../lib/verification.js";
 import { sendVerificationEmail } from "../lib/email.js";
@@ -139,6 +139,10 @@ router.post("/", requireAuth, async (req, res) => {
     gated, who_lives, pets_allowed, parking_for, sqft, one_liner, description, lat, lng, area, society_name, photos, email, phone,
     available_from, flatmate_gender_pref, food_pref, smoker_ok,
   } = req.body;
+
+  if (!isWithinChitwanBounds(lat, lng)) {
+    return res.status(400).json({ error: "Location must be within Chitwan district" });
+  }
 
   try {
     if (email) {
