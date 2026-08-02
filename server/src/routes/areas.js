@@ -6,10 +6,11 @@ const router = Router();
 
 // GET /api/areas — the full canonical ward/tole list, used for the
 // neighbourhood filter dropdown and the local (no-network) search typeahead.
-// Every seeded area is always present (with its approximate seed centroid
-// as a fallback) regardless of whether it currently has any flats — a place
-// with zero active listings must still be findable by name. Where flats do
-// exist, their averaged real centroid and count are merged in instead.
+// Every seeded area is always present, at its fixed areasData.js coordinate —
+// location is never averaged from live flats.lat/lng (a batch of flats
+// seeded or listed at a wrong position used to be able to drag an area's
+// search result away from its real-world location). Only the flat count
+// merged in below is live.
 router.get("/", async (req, res) => {
   try {
     const result = await query(
@@ -24,8 +25,8 @@ router.get("/", async (req, res) => {
       const live = liveByName.get(a.name);
       return {
         area: a.name,
-        lat: live ? Number(live.lat) : a.lat,
-        lng: live ? Number(live.lng) : a.lng,
+        lat: a.lat,
+        lng: a.lng,
         count: live ? Number(live.count) : 0,
       };
     });

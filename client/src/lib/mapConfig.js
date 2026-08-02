@@ -1,4 +1,4 @@
-export const CHITWAN_CENTER = [27.629, 84.353];
+export const CHITWAN_CENTER = [27.634, 84.429];
 export const DEFAULT_ZOOM = 12;
 
 // Split into a labels-free base layer plus a separate labels-only overlay
