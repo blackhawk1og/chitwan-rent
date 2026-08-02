@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 import Modal from "./Modal.jsx";
 import { formatRsCompact, formatRelativeTime } from "../lib/format.js";
 
@@ -48,7 +49,13 @@ function PinRow({ pin, checked, onToggle }) {
 // seeker_pins.archived_at) when the new pin is created; unchecked ones stay
 // active untouched. Archived pins are shown as read-only history, never
 // checkable, never un-archivable.
-export default function ArchiveCheckPinsModal({ existingPins, onArchiveSelectedAndAdd, onKeepAllAndAdd, onCancel }) {
+export default function ArchiveCheckPinsModal({
+  existingPins,
+  onArchiveSelectedAndAdd,
+  onKeepAllAndAdd,
+  onCancel,
+  submitting,
+}) {
   const activePins = existingPins.filter((p) => !p.archived_at);
   const archivedPins = existingPins.filter((p) => p.archived_at);
 
@@ -111,16 +118,18 @@ export default function ArchiveCheckPinsModal({ existingPins, onArchiveSelectedA
             <button
               type="button"
               onClick={() => onArchiveSelectedAndAdd([...checkedIds])}
-              className="w-full rounded-full bg-accent-purple py-3 text-sm font-bold text-white transition hover:bg-accent-purple-light"
+              disabled={submitting}
+              className="flex w-full items-center justify-center rounded-full bg-accent-purple py-3 text-sm font-bold text-white transition hover:bg-accent-purple-light disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Archive selected + add new pin
+              {submitting ? <Loader2 size={16} className="animate-spin" /> : "Archive selected + add new pin"}
             </button>
             <button
               type="button"
               onClick={onKeepAllAndAdd}
-              className="w-full rounded-full border border-white/15 py-3 text-sm font-bold text-text-primary transition hover:bg-white/5"
+              disabled={submitting}
+              className="flex w-full items-center justify-center rounded-full border border-white/15 py-3 text-sm font-bold text-text-primary transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Keep all, add new pin anyway
+              {submitting ? <Loader2 size={16} className="animate-spin" /> : "Keep all, add new pin anyway"}
             </button>
           </>
         ) : (
@@ -130,15 +139,17 @@ export default function ArchiveCheckPinsModal({ existingPins, onArchiveSelectedA
           <button
             type="button"
             onClick={onKeepAllAndAdd}
-            className="w-full rounded-full bg-accent-purple py-3 text-sm font-bold text-white transition hover:bg-accent-purple-light"
+            disabled={submitting}
+            className="flex w-full items-center justify-center rounded-full bg-accent-purple py-3 text-sm font-bold text-white transition hover:bg-accent-purple-light disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Add new pin
+            {submitting ? <Loader2 size={16} className="animate-spin" /> : "Add new pin"}
           </button>
         )}
         <button
           type="button"
           onClick={onCancel}
-          className="w-full rounded-full py-2.5 text-sm font-semibold text-text-muted transition hover:text-text-primary"
+          disabled={submitting}
+          className="w-full rounded-full py-2.5 text-sm font-semibold text-text-muted transition hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-60"
         >
           Cancel — don't add new
         </button>

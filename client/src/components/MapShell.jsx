@@ -607,8 +607,14 @@ export default function MapShell() {
 
   // Preserves the user's filled-out form: closing the modal doesn't touch
   // findFlatFlow.step or the draft pin, so DropSeekerPinForm stays mounted
-  // underneath with whatever they'd already typed.
-  const handleArchiveCheckCancel = () => setArchiveCheckState(null);
+  // underneath with whatever they'd already typed. Ignored while a request
+  // is in flight (findFlatSubmitting) — same guard as the action buttons'
+  // own `disabled`, since Modal's backdrop-click/X both route through this
+  // same handler and shouldn't be able to dismiss mid-request either.
+  const handleArchiveCheckCancel = () => {
+    if (findFlatSubmitting) return;
+    setArchiveCheckState(null);
+  };
 
   const resetToletFlow = () => {
     setToletPhoto(null);
@@ -1007,6 +1013,7 @@ export default function MapShell() {
           onArchiveSelectedAndAdd={handleArchiveCheckArchiveSelected}
           onKeepAllAndAdd={handleArchiveCheckKeepAll}
           onCancel={handleArchiveCheckCancel}
+          submitting={findFlatSubmitting}
         />
       )}
 
