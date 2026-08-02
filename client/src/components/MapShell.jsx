@@ -24,6 +24,7 @@ import { useCreateToletSpot } from "../hooks/useCreateToletSpot.js";
 import { useCreateRentReport } from "../hooks/useCreateRentReport.js";
 import { usePinDropFlow } from "../hooks/usePinDropFlow.js";
 import { formatRs, formatRsCompact, bhkLabel } from "../lib/format.js";
+import { fetchJson } from "../lib/api.js";
 import { DEFAULT_FILTERS, countActiveFilters } from "../lib/filters.js";
 import {
   createDotIcon,
@@ -61,6 +62,7 @@ import ListFlatBranchModal from "./ListFlatBranchModal.jsx";
 import ListFlatDetailsForm from "./ListFlatDetailsForm.jsx";
 import ListFlatSuccessModal from "./ListFlatSuccessModal.jsx";
 import DropSeekerPinForm from "./DropSeekerPinForm.jsx";
+import ArchiveCheckPinsModal from "./ArchiveCheckPinsModal.jsx";
 import SpotToLetModal from "./SpotToLetModal.jsx";
 import SuperheroesModal from "./SuperheroesModal.jsx";
 import MoreModal from "./MoreModal.jsx";
@@ -179,6 +181,12 @@ export default function MapShell() {
   // createSeekerPin's own mutation state — see handleSubmitSeekerForm.
   const [findFlatSubmitting, setFindFlatSubmitting] = useState(false);
   const [findFlatSubmitError, setFindFlatSubmitError] = useState(false);
+  // Non-null while the archive-check modal is showing — { existingPins,
+  // form }, set once GET /seeker-pins/by-email comes back non-empty. The
+  // underlying DropSeekerPinForm stays mounted (and its input state intact)
+  // the whole time, since this only adds an overlay on top rather than
+  // changing findFlatFlow.step — see handleSubmitSeekerForm.
+  const [archiveCheckState, setArchiveCheckState] = useState(null);
 
   // Empty-map-tap quick action chooser: { step: 'chooser' | 'rent-report', lat, lng } | null
   const [quickAction, setQuickAction] = useState(null);
@@ -519,38 +527,88 @@ export default function MapShell() {
   };
 
   // Same inline-login pattern as handleSubmitListFlatDetails above.
+  // Shared by both the direct (no existing pins) and post-archive-check
+  // paths below — archivePinIds is [] unless the user picked "Archive
+  // selected + add new pin" in ArchiveCheckPinsModal.
+  const finalizeCreateSeekerPin = async (form, archivePinIds) => {
+    const created = await createSeekerPin.mutateAsync({
+      looking_for: form.lookingFor,
+      budget: Number(form.budget),
+      bhk_pref: form.bhkPref,
+      move_in: form.moveIn,
+      food_pref: form.foodPref,
+      smoker_ok: form.smokerOk,
+      gender: form.gender,
+      flatmate_gender_pref: form.flatmateGenderPref,
+      parking_required: form.parkingRequired,
+      lifestyle_note: form.lifestyleNote || null,
+      email: form.email,
+      phone: form.phone,
+      lat: findFlatFlow.draftPin.lat,
+      lng: findFlatFlow.draftPin.lng,
+      area: findFlatFlow.draftPin.area,
+      archive_pin_ids: archivePinIds.length > 0 ? archivePinIds : undefined,
+    });
+    mapRef.current?.flyTo([created.lat, created.lng], 16, { duration: 1 });
+    findFlatFlow.finish();
+    navigate("/");
+  };
+
+  // Before creating a new pin, checks whether this email already has any
+  // seeker_pins (active or archived) — see GET /api/seeker-pins/by-email.
+  // None found: create immediately, exactly as before (a truly first-time
+  // email never sees the archive-check modal). Any found: hold off and show
+  // ArchiveCheckPinsModal instead — its own three actions call
+  // finalizeCreateSeekerPin themselves once the user decides.
   const handleSubmitSeekerForm = async (form) => {
     if (!findFlatFlow.draftPin) return;
     setFindFlatSubmitting(true);
     setFindFlatSubmitError(false);
     try {
       await login({ email: form.email, phone: form.phone });
-      const created = await createSeekerPin.mutateAsync({
-        looking_for: form.lookingFor,
-        budget: Number(form.budget),
-        bhk_pref: form.bhkPref,
-        move_in: form.moveIn,
-        food_pref: form.foodPref,
-        smoker_ok: form.smokerOk,
-        gender: form.gender,
-        flatmate_gender_pref: form.flatmateGenderPref,
-        parking_required: form.parkingRequired,
-        lifestyle_note: form.lifestyleNote || null,
-        email: form.email,
-        phone: form.phone,
-        lat: findFlatFlow.draftPin.lat,
-        lng: findFlatFlow.draftPin.lng,
-        area: findFlatFlow.draftPin.area,
-      });
-      mapRef.current?.flyTo([created.lat, created.lng], 16, { duration: 1 });
-      findFlatFlow.finish();
-      navigate("/");
+      const existingPins = await fetchJson(`/seeker-pins/by-email?email=${encodeURIComponent(form.email)}`);
+      if (existingPins.length > 0) {
+        setArchiveCheckState({ existingPins, form });
+        return;
+      }
+      await finalizeCreateSeekerPin(form, []);
     } catch {
       setFindFlatSubmitError(true);
     } finally {
       setFindFlatSubmitting(false);
     }
   };
+
+  const handleArchiveCheckArchiveSelected = async (checkedIds) => {
+    setFindFlatSubmitting(true);
+    try {
+      await finalizeCreateSeekerPin(archiveCheckState.form, checkedIds);
+      setArchiveCheckState(null);
+    } catch {
+      setFindFlatSubmitError(true);
+      setArchiveCheckState(null);
+    } finally {
+      setFindFlatSubmitting(false);
+    }
+  };
+
+  const handleArchiveCheckKeepAll = async () => {
+    setFindFlatSubmitting(true);
+    try {
+      await finalizeCreateSeekerPin(archiveCheckState.form, []);
+      setArchiveCheckState(null);
+    } catch {
+      setFindFlatSubmitError(true);
+      setArchiveCheckState(null);
+    } finally {
+      setFindFlatSubmitting(false);
+    }
+  };
+
+  // Preserves the user's filled-out form: closing the modal doesn't touch
+  // findFlatFlow.step or the draft pin, so DropSeekerPinForm stays mounted
+  // underneath with whatever they'd already typed.
+  const handleArchiveCheckCancel = () => setArchiveCheckState(null);
 
   const resetToletFlow = () => {
     setToletPhoto(null);
@@ -940,6 +998,15 @@ export default function MapShell() {
           onSubmit={handleSubmitSeekerForm}
           submitting={findFlatSubmitting}
           submitError={findFlatSubmitError ? "Something went wrong — please try again." : null}
+        />
+      )}
+
+      {archiveCheckState && (
+        <ArchiveCheckPinsModal
+          existingPins={archiveCheckState.existingPins}
+          onArchiveSelectedAndAdd={handleArchiveCheckArchiveSelected}
+          onKeepAllAndAdd={handleArchiveCheckKeepAll}
+          onCancel={handleArchiveCheckCancel}
         />
       )}
 

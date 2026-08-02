@@ -6,14 +6,40 @@ import { sendSeekerConfirmationEmail } from "../lib/email.js";
 
 const router = Router();
 
-// GET /api/seeker-pins
+// GET /api/seeker-pins — active pins only (archived_at IS NULL). This feeds
+// the map layer; an archived pin is meant to disappear from the map, not
+// just stop matching, so it's excluded here the same way it's excluded from
+// digestJob.js's ACTIVE_SEEKERS_SQL.
 router.get("/", async (req, res) => {
   try {
-    const result = await query("SELECT * FROM seeker_pins ORDER BY created_at DESC");
+    const result = await query("SELECT * FROM seeker_pins WHERE archived_at IS NULL ORDER BY created_at DESC");
     res.json(result.rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch seeker pins" });
+  }
+});
+
+// GET /api/seeker-pins/by-email?email=... — every seeker_pins row (active
+// AND archived) for this email, used by the client right before creating a
+// new pin to decide whether to show the archive-check modal (see POST /
+// below). Deliberately public, no auth — matches this file's existing read
+// endpoints (only the write below requires it), and a plain client-side
+// fetchJson() call (no Bearer token attached) is what calls this. Must stay
+// registered before GET /:id, or Express would match "by-email" as an :id.
+router.get("/by-email", async (req, res) => {
+  const email = typeof req.query.email === "string" ? req.query.email.trim() : "";
+  if (!email) return res.json([]);
+
+  try {
+    const result = await query(
+      "SELECT * FROM seeker_pins WHERE email = $1 ORDER BY created_at DESC",
+      [email]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to look up existing seeker pins" });
   }
 });
 
@@ -34,7 +60,7 @@ router.post("/", requireAuth, async (req, res) => {
   const {
     looking_for, budget, bhk_pref, move_in, food_pref, smoker_ok,
     gender, flatmate_gender_pref, parking_required, lifestyle_note, email, phone,
-    lat, lng, area,
+    lat, lng, area, archive_pin_ids,
   } = req.body;
 
   try {
@@ -42,6 +68,22 @@ router.post("/", requireAuth, async (req, res) => {
       await query(
         "UPDATE users SET email = COALESCE(email, $1), phone = COALESCE(phone, $2) WHERE id = $3",
         [email ?? null, phone ?? null, req.userId]
+      );
+    }
+
+    // Archive-check modal's "Archive selected + add new pin" action (see
+    // GET /by-email above and ArchiveCheckPinsModal.jsx) — archives
+    // whichever of the submitter's own existing pins they left checked,
+    // before the new one is created. Scoped to `email` (not just the raw
+    // ids) as a sanity guard against archiving pins that don't actually
+    // belong to the email being submitted; already-archived rows are a
+    // no-op via the archived_at IS NULL condition, since archiving is
+    // one-directional. Never touches pins the user unchecked — those stay
+    // active exactly as they were.
+    if (Array.isArray(archive_pin_ids) && archive_pin_ids.length > 0 && email) {
+      await query(
+        "UPDATE seeker_pins SET archived_at = now() WHERE id = ANY($1) AND email = $2 AND archived_at IS NULL",
+        [archive_pin_ids, email]
       );
     }
 

@@ -90,12 +90,12 @@ async function logMatchSeen(flatId, seekerPinId) {
 // Only status='available', non-seed flats participate — a deleted flat
 // (delete-flat feature or /unsubscribe) or a never-verified, expired
 // listing (cleanupExpiredListings) is simply gone from `flats` by the time
-// this runs. seeker_pins has no status/verification/expiry concept at all
-// (confirmed against schema.sql and routes/seekerPins.js) — a pin is
-// "active" for as long as its row exists, full stop; is_seed=false is the
-// only filter needed on that side. is_seed=false on both sides keeps
-// seed.js's dummy data (fake emails, fake phone numbers) out of every
-// digest.
+// this runs. seeker_pins has no verification/expiry concept, but it does
+// now have a soft-archive state (seeker_pins.archived_at — see
+// db/add-seeker-pins-archived-at.js and the archive-check modal in
+// routes/seekerPins.js's POST /): a pin is "active" while its row exists
+// AND archived_at is still NULL. is_seed=false on both sides keeps seed.js's
+// dummy data (fake emails, fake phone numbers) out of every digest.
 const ACTIVE_FLATS_SQL = `
   SELECT f.*, u.name AS owner_name, u.phone AS owner_phone, u.email AS owner_email
   FROM flats f
@@ -106,7 +106,7 @@ const ACTIVE_SEEKERS_SQL = `
   SELECT sp.*, u.name AS seeker_name
   FROM seeker_pins sp
   LEFT JOIN users u ON u.id = sp.user_id
-  WHERE sp.is_seed = false
+  WHERE sp.is_seed = false AND sp.archived_at IS NULL
 `;
 
 function findCompatible(subject, pool, subjectIsFlat) {
