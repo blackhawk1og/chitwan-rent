@@ -223,6 +223,91 @@ export async function sendDeleteCodeEmail({ to, flatId, code }) {
   });
 }
 
+function reportRemovalReasonsHtml(reasons) {
+  if (!reasons || reasons.length === 0) return "";
+  const items = reasons.map((r) => `<li style="margin:0 0 4px;">${escapeHtml(r)}</li>`).join("");
+  return `
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 20px;">
+      <tr>
+        <td style="border-radius:10px;background-color:#f4f4f7;padding:14px 18px;">
+          <p style="margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#6b7280;">Reasons given</p>
+          <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6;color:#374151;">${items}</ul>
+        </td>
+      </tr>
+    </table>`;
+}
+
+// reasons is every non-null flat_reports.reason for this flat, oldest first
+// — never the reporter's identity (user_id is intentionally not selected by
+// the caller). Falls back to just stating the count when no report included
+// a reason (reason is optional at submission time — see ReportReasonModal.jsx).
+function reportRemovalEmailHtml({ flatId, reportCount, reasons }) {
+  const hasReasons = reasons && reasons.length > 0;
+  const summaryLine = hasReasons
+    ? "Here's what people reported:"
+    : `It received ${reportCount} report${reportCount === 1 ? "" : "s"}, which crossed our removal threshold — no specific reasons were given.`;
+
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background-color:#f4f4f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f7;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+            <tr>
+              <td style="background-color:${BRAND_PURPLE};padding:24px 32px;">
+                <span style="color:#ffffff;font-size:18px;font-weight:700;">Chitwan Rent</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px 32px 8px;">
+                <h1 style="margin:0 0 16px;font-size:20px;color:#111827;">Your listing was removed</h1>
+
+                <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#374151;">
+                  Your flat listing (ID <strong>${flatId}</strong>) has been taken off the Chitwan Rent map.
+                  Other users flagged it enough times to cross our automatic removal threshold
+                  (${reportCount} report${reportCount === 1 ? "" : "s"}).
+                </p>
+
+                <p style="margin:0 0 12px;font-size:13px;line-height:1.6;color:#4b5563;">${escapeHtml(summaryLine)}</p>
+
+                ${reportRemovalReasonsHtml(reasons)}
+
+                <p style="margin:0;font-size:12px;color:#9ca3af;">
+                  You're welcome to list again — the usual 24-hour limit between listings still applies,
+                  the same as for any new listing.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 32px 28px;">
+                <p style="margin:0;font-size:12px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:16px;">
+                  This is an automated notice — no action is needed unless you'd like to list again.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+// Fired once, right when a report pushes a flat's report_count to the
+// removal threshold (see POST /:id/report in routes/flats.js) — never again
+// on later reports, since the flat is already off the map by then. Same
+// throw-on-failure, log-and-continue contract as every other send*Email
+// function here.
+export async function sendReportRemovalEmail({ to, flatId, reportCount, reasons }) {
+  await transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to,
+    subject: "Your Chitwan Rent listing was removed",
+    html: reportRemovalEmailHtml({ flatId, reportCount, reasons }),
+  });
+}
+
 // matchName comes from users.name — free text someone typed into the
 // optional "Your name" field at sign-in (see AuthGateModal.jsx) — the first
 // place this file interpolates user-supplied text into an HTML email, so it

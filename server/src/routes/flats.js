@@ -3,12 +3,19 @@ import { query } from "../db.js";
 import { isNearAnyRoute, isWithinChitwanBounds } from "../lib/geo.js";
 import { requireAuth } from "../lib/auth.js";
 import { generateVerificationToken } from "../lib/verification.js";
-import { sendVerificationEmail } from "../lib/email.js";
+import { sendVerificationEmail, sendReportRemovalEmail } from "../lib/email.js";
 import { checkListingRateLimit, recordListingAttempt } from "../lib/listingRateLimit.js";
 import { hashDeleteCode, deleteCodeHashMatches } from "../lib/deleteCode.js";
 import { checkDeleteAttemptLimit, recordFailedDeleteAttempt } from "../lib/deleteAttemptLimit.js";
 
 const DELETE_ELIGIBILITY_DELAY_MS = 24 * 60 * 60 * 1000;
+
+// Mirrors the GET /'s own inline `f.report_count < 3` filter below — that's
+// the actual (passive, read-time) removal mechanism, there's no discrete
+// "remove this flat" action anywhere. This constant only drives when the
+// report route below fires the owner notification once, at the exact moment
+// a flat's report_count crosses into that filtered-out range.
+const REPORT_REMOVAL_THRESHOLD = 3;
 
 // Base URL for the link a verification email points at — see
 // routes/verifyListing.js, mounted at this same origin's /verify-listing.
@@ -362,20 +369,53 @@ router.post("/:id/rating", requireAuth, async (req, res) => {
 // POST /api/flats/:id/report  { reason? }
 router.post("/:id/report", requireAuth, async (req, res) => {
   const reason = req.body?.reason?.trim() || null;
+  const flatId = req.params.id;
 
   try {
     await query(
       "INSERT INTO flat_reports (flat_id, user_id, reason) VALUES ($1, $2, $3)",
-      [req.params.id, req.userId, reason]
+      [flatId, req.userId, reason]
     );
     const result = await query(
       "UPDATE flats SET report_count = report_count + 1 WHERE id = $1 RETURNING report_count",
-      [req.params.id]
+      [flatId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Flat not found" });
     }
-    res.status(201).json({ report_count: result.rows[0].report_count });
+    const reportCount = result.rows[0].report_count;
+
+    // Fires exactly once, right as this flat crosses into GET /'s
+    // report_count filter above — not on every report after that, since the
+    // flat is already off the map by then. Never lets a failed send affect
+    // the report response; same log-and-continue contract as every other
+    // email in this app.
+    if (reportCount === REPORT_REMOVAL_THRESHOLD) {
+      try {
+        const ownerResult = await query(
+          "SELECT u.email AS owner_email FROM flats f LEFT JOIN users u ON u.id = f.owner_id WHERE f.id = $1",
+          [flatId]
+        );
+        const ownerEmail = ownerResult.rows[0]?.owner_email;
+        if (ownerEmail) {
+          const reasonsResult = await query(
+            "SELECT reason FROM flat_reports WHERE flat_id = $1 AND reason IS NOT NULL ORDER BY created_at ASC",
+            [flatId]
+          );
+          await sendReportRemovalEmail({
+            to: ownerEmail,
+            flatId,
+            reportCount,
+            reasons: reasonsResult.rows.map((r) => r.reason),
+          });
+          console.log(`Report-removal email sent: flat ${flatId}`);
+        }
+      } catch (emailErr) {
+        console.error(`Report-removal email failed: flat ${flatId}`, emailErr.message);
+      }
+    }
+
+    res.status(201).json({ report_count: reportCount });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to submit report" });

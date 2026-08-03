@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import LegalModal from "./LegalModal.jsx";
 
 const SHARE_MESSAGE =
   "Check out chitwan.rent — every rental in Chitwan on one map. ₹0 brokerage, no signup needed to browse. 🏠📍";
@@ -52,6 +54,8 @@ function Tile({ emoji, title, subtitle, to, onClick }) {
 // dismissed for that session by "Let's start" or by picking any of the four
 // tiles below — "Share" alone does not dismiss it.
 export default function LandingCard({ onDismiss, areas = [] }) {
+  const [legalModal, setLegalModal] = useState(null); // 'privacy' | 'terms' | null
+
   const handleShareWhatsapp = () => {
     window.open(`https://wa.me/?text=${encodeURIComponent(SHARE_MESSAGE)}`, "_blank", "noopener,noreferrer");
   };
@@ -98,7 +102,23 @@ export default function LandingCard({ onDismiss, areas = [] }) {
         </div>
 
         <p className="mt-5 text-xs text-text-muted">
-          By moving forward to the map, you agree to our Privacy Policy and Terms of Use.{" "}
+          By moving forward to the map, you agree to our{" "}
+          <button
+            type="button"
+            onClick={() => setLegalModal("privacy")}
+            className="text-accent-purple-light hover:underline"
+          >
+            Privacy Policy
+          </button>{" "}
+          and{" "}
+          <button
+            type="button"
+            onClick={() => setLegalModal("terms")}
+            className="text-accent-purple-light hover:underline"
+          >
+            Terms of Use
+          </button>
+          .{" "}
           <Link to="/how-to-use" onClick={onDismiss} className="text-accent-purple-light hover:underline">
             Learn how to use
           </Link>
@@ -122,6 +142,8 @@ export default function LandingCard({ onDismiss, areas = [] }) {
           </button>
         </div>
       </div>
+
+      {legalModal && <LegalModal type={legalModal} onClose={() => setLegalModal(null)} />}
     </div>
   );
 }
