@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { Mail, MapPin, Crosshair, Map as MapIcon } from "lucide-react";
+import { Mail, MapPin, Crosshair, Map as MapIcon, AlertTriangle } from "lucide-react";
 import Modal from "./Modal.jsx";
 
 export default function SpotToLetModal({
@@ -41,6 +41,13 @@ export default function SpotToLetModal({
             See a To-Let board? Put it on the map — help the next flat-hunter skip the broker.
           </p>
         </div>
+      </div>
+
+      <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3">
+        <AlertTriangle size={16} className="mt-0.5 shrink-0 text-red-400" />
+        <p className="text-sm font-semibold text-red-400">
+          This feature is temporarily unavailable. We're working on it — please check back soon.
+        </p>
       </div>
 
       <input

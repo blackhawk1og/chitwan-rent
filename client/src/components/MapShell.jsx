@@ -38,6 +38,7 @@ import SearchBar from "./SearchBar.jsx";
 import IconStack from "./IconStack.jsx";
 import OnboardingModal, { isOnboardingDismissed } from "./OnboardingModal.jsx";
 import HowToUseTour, { isHowToUseTourSeen } from "./HowToUseTour.jsx";
+import LandingCard from "./LandingCard.jsx";
 import FilterModal from "./FilterModal.jsx";
 import FlatsLayer from "./FlatsLayer.jsx";
 import ToletSpotsLayer from "./ToletSpotsLayer.jsx";
@@ -117,6 +118,20 @@ export default function MapShell() {
   const withAuth = (action) => {
     if (isAuthenticated) action();
     else setPendingAuthAction(() => action);
+  };
+
+  // Front door on every page load (see LandingCard.jsx) — shown on top of
+  // everything else including HowToUseTour, every time MapShell mounts (i.e.
+  // every refresh), not gated by a "seen" flag. Its own effect below
+  // (unchanged) may have already navigated to "/how-to-use" by the time this
+  // dismisses; the "Browse"/"Pin your rent"/"Let's start" paths correct back
+  // to "/" so the tour doesn't surface right behind it, while the List My
+  // Flat/Find a Flat tiles' own <Link> navigations (which fire immediately
+  // after, same click) still win as intended.
+  const [showLanding, setShowLanding] = useState(true);
+  const handleDismissLanding = () => {
+    setShowLanding(false);
+    if (location.pathname === "/how-to-use") navigate("/");
   };
 
   // First-time visitors land straight on the guided tour (see
@@ -1199,6 +1214,8 @@ export default function MapShell() {
           ⚠️ {locateError}
         </div>
       )}
+
+      {showLanding && <LandingCard onDismiss={handleDismissLanding} areas={areas} />}
     </div>
   );
 }
