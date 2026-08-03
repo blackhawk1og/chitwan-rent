@@ -183,6 +183,8 @@ CREATE TABLE rent_reports (
   rent INT,
   bhk INT,
   gated TEXT CHECK (gated IN ('gated','not_gated')),
+  furnishing TEXT CHECK (furnishing IN ('furnished','unfurnished')), -- optional, matches flats.furnishing
+  parking_for INT, -- optional, matches flats.parking_for (nullable here: unspecified != 0)
   created_at TIMESTAMP DEFAULT now()
 );
 

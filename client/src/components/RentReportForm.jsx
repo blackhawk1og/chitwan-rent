@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Sofa, Box, ShieldCheck, ShieldOff } from "lucide-react";
 import Modal from "./Modal.jsx";
 import TextField from "./ui/TextField.jsx";
 import Pill from "./ui/Pill.jsx";
@@ -11,12 +12,14 @@ export default function RentReportForm({ onCancel, onSubmit, submitting, submitE
   const [rent, setRent] = useState("");
   const [bhk, setBhk] = useState(null);
   const [gated, setGated] = useState(null); // 'gated' | 'not_gated'
+  const [furnishing, setFurnishing] = useState(null); // 'furnished' | 'unfurnished' | null — optional
+  const [parkingFor, setParkingFor] = useState(""); // optional
 
   const isValid = rent !== "" && Number(rent) > 0 && bhk !== null && gated !== null;
 
   const handleSubmit = () => {
     if (!isValid || submitting) return;
-    onSubmit({ rent, bhk, gated });
+    onSubmit({ rent, bhk, gated, furnishing, parkingFor });
   };
 
   return (
@@ -27,6 +30,17 @@ export default function RentReportForm({ onCancel, onSubmit, submitting, submitE
       </p>
 
       <div className="mt-5 space-y-4">
+        <div>
+          <SectionLabel>BHK *</SectionLabel>
+          <div className="flex flex-wrap gap-2">
+            {BHK_OPTIONS.map((n) => (
+              <Pill key={n} accent="purple" active={bhk === n} onClick={() => setBhk(n)}>
+                {n >= 5 ? "5+" : n}
+              </Pill>
+            ))}
+          </div>
+        </div>
+
         <TextField
           label="Monthly rent (Rs.) *"
           prefix="Rs."
@@ -39,27 +53,49 @@ export default function RentReportForm({ onCancel, onSubmit, submitting, submitE
         />
 
         <div>
-          <SectionLabel>BHK *</SectionLabel>
-          <div className="flex flex-wrap gap-2">
-            {BHK_OPTIONS.map((n) => (
-              <Pill key={n} accent="purple" active={bhk === n} onClick={() => setBhk(n)}>
-                {n >= 5 ? "5+" : n}
-              </Pill>
-            ))}
-          </div>
-        </div>
-
-        <div>
           <SectionLabel>Society *</SectionLabel>
           <div className="flex gap-2">
-            <ToggleButton accent="purple" active={gated === "gated"} onClick={() => setGated("gated")}>
+            <ToggleButton accent="purple" icon={ShieldCheck} active={gated === "gated"} onClick={() => setGated("gated")}>
               Gated
             </ToggleButton>
-            <ToggleButton accent="purple" active={gated === "not_gated"} onClick={() => setGated("not_gated")}>
+            <ToggleButton accent="purple" icon={ShieldOff} active={gated === "not_gated"} onClick={() => setGated("not_gated")}>
               Not Gated
             </ToggleButton>
           </div>
         </div>
+
+        <div>
+          <SectionLabel>Furnishing</SectionLabel>
+          <div className="flex gap-2">
+            <ToggleButton
+              accent="purple"
+              icon={Sofa}
+              active={furnishing === "furnished"}
+              onClick={() => setFurnishing(furnishing === "furnished" ? null : "furnished")}
+            >
+              Furnished
+            </ToggleButton>
+            <ToggleButton
+              accent="purple"
+              icon={Box}
+              active={furnishing === "unfurnished"}
+              onClick={() => setFurnishing(furnishing === "unfurnished" ? null : "unfurnished")}
+            >
+              Unfurnished
+            </ToggleButton>
+          </div>
+        </div>
+
+        <TextField
+          label="Parking"
+          suffix="cars"
+          type="number"
+          min="0"
+          placeholder="0"
+          value={parkingFor}
+          onChange={(e) => setParkingFor(e.target.value)}
+          helper="Optional — leave blank if you're not sure."
+        />
       </div>
 
       {submitError && <p className="mt-3 text-sm text-red-400">{submitError}</p>}

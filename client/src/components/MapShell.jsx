@@ -364,6 +364,8 @@ export default function MapShell() {
         rent: Number(form.rent),
         bhk: form.bhk,
         gated: form.gated,
+        furnishing: form.furnishing ?? null,
+        parking_for: form.parkingFor !== "" ? Number(form.parkingFor) : null,
         lat: quickAction.lat,
         lng: quickAction.lng,
       });

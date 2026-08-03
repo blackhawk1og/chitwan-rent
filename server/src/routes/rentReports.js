@@ -15,9 +15,9 @@ router.get("/", async (req, res) => {
   }
 });
 
-// POST /api/rent-reports  { rent, bhk, gated, lat, lng } — anonymous, no auth.
+// POST /api/rent-reports  { rent, bhk, gated, lat, lng, furnishing?, parking_for? } — anonymous, no auth.
 router.post("/", async (req, res) => {
-  const { rent, bhk, gated, lat, lng } = req.body;
+  const { rent, bhk, gated, lat, lng, furnishing, parking_for } = req.body;
 
   const rentNum = Number(rent);
   const bhkNum = Number(bhk);
@@ -36,11 +36,22 @@ router.post("/", async (req, res) => {
   if (!isWithinChitwanBounds(lat, lng)) {
     return res.status(400).json({ error: "Location must be within Chitwan district" });
   }
+  if (furnishing != null && furnishing !== "furnished" && furnishing !== "unfurnished") {
+    return res.status(400).json({ error: "furnishing must be 'furnished' or 'unfurnished'" });
+  }
+  let parkingForNum = null;
+  if (parking_for !== undefined && parking_for !== null && parking_for !== "") {
+    parkingForNum = Number(parking_for);
+    if (!Number.isInteger(parkingForNum) || parkingForNum < 0) {
+      return res.status(400).json({ error: "parking_for must be a non-negative integer" });
+    }
+  }
 
   try {
     const result = await query(
-      `INSERT INTO rent_reports (lat, lng, rent, bhk, gated) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [lat, lng, rentNum, bhkNum, gated]
+      `INSERT INTO rent_reports (lat, lng, rent, bhk, gated, furnishing, parking_for)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [lat, lng, rentNum, bhkNum, gated, furnishing ?? null, parkingForNum]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
