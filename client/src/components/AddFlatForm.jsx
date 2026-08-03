@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sofa, Box, ShieldCheck, ShieldOff, Users, User } from "lucide-react";
+import { Sofa, Box, ShieldCheck, ShieldOff, Users, User, AlertTriangle } from "lucide-react";
 import Modal from "./Modal.jsx";
 import Switch from "./Switch.jsx";
 import Pill from "./ui/Pill.jsx";
@@ -7,6 +7,7 @@ import ToggleButton from "./ui/ToggleButton.jsx";
 import SectionLabel from "./ui/SectionLabel.jsx";
 import TextField from "./ui/TextField.jsx";
 import RentCapConfirmModal from "./RentCapConfirmModal.jsx";
+import { bhkLabel } from "../lib/format.js";
 
 const BHK_OPTIONS = [
   { value: 1, label: "1" },
@@ -50,6 +51,7 @@ const initialForm = {
 export default function AddFlatForm({ onCancel, onSubmit, submitting, submitError, area }) {
   const [form, setForm] = useState(initialForm);
   const [showRentCapConfirm, setShowRentCapConfirm] = useState(false);
+  const [ceilingBlockAttempted, setCeilingBlockAttempted] = useState(false);
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
@@ -68,8 +70,18 @@ export default function AddFlatForm({ onCancel, onSubmit, submitting, submitErro
       ? `Rent seems too high — maximum is ₹${rentCap.toLocaleString("en-IN")}/month`
       : null;
 
+  // Absolute ceiling: more than double the BHK's cap. No confirm/override
+  // path at this tier — Proceed just refuses and explains why, form intact.
+  const rentCeiling = rentCap !== null ? rentCap * 2 : null;
+  const isOverRentCeiling =
+    rentCeiling !== null && form.rent !== "" && Number.isFinite(rentNum) && rentNum > rentCeiling;
+
   const handleSubmit = () => {
     if (!isValid || submitting) return;
+    if (isOverRentCeiling) {
+      setCeilingBlockAttempted(true);
+      return;
+    }
     if (rentCapWarning) {
       setShowRentCapConfirm(true);
       return;
@@ -245,6 +257,16 @@ export default function AddFlatForm({ onCancel, onSubmit, submitting, submitErro
       </div>
 
       {submitError && <p className="mt-4 text-sm text-red-400">{submitError}</p>}
+
+      {ceilingBlockAttempted && isOverRentCeiling && (
+        <div className="mt-3 flex items-start gap-2 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-red-400" />
+          <p className="text-sm font-semibold text-red-400">
+            This rent is more than double the typical maximum for a {bhkLabel(form.bhk)} (₹
+            {rentCeiling?.toLocaleString("en-IN")}) and can't be accepted. Please lower the amount to continue.
+          </p>
+        </div>
+      )}
 
       <div className="mt-6 flex gap-3">
         <button
