@@ -502,6 +502,9 @@ export default function MapShell() {
         pets_allowed: step0.petsAllowed,
         // Parking is only asked once, in Step 0 — Step 2 no longer re-asks it.
         parking_for: Number(step0.parkingFor),
+        // Set only when the owner explicitly confirmed an over-cap rent via
+        // AddFlatForm's RentCapConfirmModal — see AddFlatForm.jsx.
+        rent_flagged: step0.rentFlagged === true,
         sqft: step0.sqft === "" ? null : Number(step0.sqft),
         society_name: step0.societyName || null,
         one_liner: step0.oneLiner || null,

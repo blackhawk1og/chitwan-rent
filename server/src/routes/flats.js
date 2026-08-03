@@ -144,7 +144,7 @@ router.post("/", requireAuth, async (req, res) => {
   const {
     listing_type, bhk, rent, deposit, furnishing, includes_maintenance,
     gated, who_lives, pets_allowed, parking_for, sqft, one_liner, description, lat, lng, area, society_name, photos, email, phone,
-    available_from, flatmate_gender_pref, food_pref, smoker_ok,
+    available_from, flatmate_gender_pref, food_pref, smoker_ok, rent_flagged,
   } = req.body;
 
   if (!isWithinChitwanBounds(lat, lng)) {
@@ -189,15 +189,15 @@ router.post("/", requireAuth, async (req, res) => {
       `INSERT INTO flats
         (owner_id, listing_type, bhk, rent, deposit, furnishing, includes_maintenance,
          gated, who_lives, pets_allowed, parking_for, sqft, one_liner, description, status, lat, lng, area, society_name, photos,
-         available_from, flatmate_gender_pref, food_pref, smoker_ok, verification_token, verification_token_expires_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'pending_verification',$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,now() + interval '24 hours')
+         available_from, flatmate_gender_pref, food_pref, smoker_ok, verification_token, verification_token_expires_at, rent_flagged)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'pending_verification',$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,now() + interval '24 hours',$25)
        RETURNING *`,
       [
         req.userId, listing_type ?? "flat", bhk, rent, deposit ?? null, furnishing,
         includes_maintenance ?? false, gated, who_lives ?? null, pets_allowed ?? null,
         parking_for ?? 0, sqft ?? null, one_liner ?? null, description ?? null, lat, lng, area ?? null, society_name ?? null, photos ?? [],
         available_from ?? null, flatmate_gender_pref ?? null, food_pref ?? null, smoker_ok ?? null,
-        verificationToken,
+        verificationToken, rent_flagged === true,
       ]
     );
 

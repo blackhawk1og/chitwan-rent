@@ -96,11 +96,15 @@ async function logMatchSeen(flatId, seekerPinId) {
 // routes/seekerPins.js's POST /): a pin is "active" while its row exists
 // AND archived_at is still NULL. is_seed=false on both sides keeps seed.js's
 // dummy data (fake emails, fake phone numbers) out of every digest.
+// f.rent_flagged = false excludes owner-confirmed over-cap listings from
+// matching only — they stay visible on the map and under ?status=available
+// (see AddFlatForm.jsx's RentCapConfirmModal), same exclusion shape as
+// is_seed but a different reason.
 const ACTIVE_FLATS_SQL = `
   SELECT f.*, u.name AS owner_name, u.phone AS owner_phone, u.email AS owner_email
   FROM flats f
   LEFT JOIN users u ON u.id = f.owner_id
-  WHERE f.status = 'available' AND f.is_seed = false
+  WHERE f.status = 'available' AND f.is_seed = false AND f.rent_flagged = false
 `;
 const ACTIVE_SEEKERS_SQL = `
   SELECT sp.*, u.name AS seeker_name

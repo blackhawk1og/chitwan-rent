@@ -6,6 +6,7 @@ import Pill from "./ui/Pill.jsx";
 import ToggleButton from "./ui/ToggleButton.jsx";
 import SectionLabel from "./ui/SectionLabel.jsx";
 import TextField from "./ui/TextField.jsx";
+import RentCapConfirmModal from "./RentCapConfirmModal.jsx";
 
 const BHK_OPTIONS = [
   { value: 1, label: "1" },
@@ -20,6 +21,15 @@ const PETS_OPTIONS = [
   { value: "no", label: "No", emoji: "🚫" },
   { value: "not_sure", label: "Not sure", emoji: "🤷" },
 ];
+
+// Flat, BHK-based caps only — no percentage or furnished/gated/parking
+// multipliers. Soft warning: informational only, never blocks submission.
+const RENT_CAPS = { 1: 15000, 2: 30000, 3: 45000, 4: 60000, 5: 100000 };
+
+function getRentCap(bhk) {
+  if (bhk === null) return null;
+  return RENT_CAPS[bhk] ?? RENT_CAPS[5];
+}
 
 const initialForm = {
   bhk: null,
@@ -39,6 +49,7 @@ const initialForm = {
 
 export default function AddFlatForm({ onCancel, onSubmit, submitting, submitError, area }) {
   const [form, setForm] = useState(initialForm);
+  const [showRentCapConfirm, setShowRentCapConfirm] = useState(false);
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
@@ -50,9 +61,27 @@ export default function AddFlatForm({ onCancel, onSubmit, submitting, submitErro
     form.parkingFor !== "" &&
     form.societyName !== "";
 
+  const rentCap = getRentCap(form.bhk);
+  const rentNum = Number(form.rent);
+  const rentCapWarning =
+    rentCap !== null && form.rent !== "" && Number.isFinite(rentNum) && rentNum > rentCap
+      ? `Rent seems too high — maximum is ₹${rentCap.toLocaleString("en-IN")}/month`
+      : null;
+
   const handleSubmit = () => {
     if (!isValid || submitting) return;
+    if (rentCapWarning) {
+      setShowRentCapConfirm(true);
+      return;
+    }
     onSubmit(form);
+  };
+
+  const handleReCheckRent = () => setShowRentCapConfirm(false);
+
+  const handleConfirmFlaggedRent = () => {
+    setShowRentCapConfirm(false);
+    onSubmit({ ...form, rentFlagged: true });
   };
 
   return (
@@ -77,16 +106,19 @@ export default function AddFlatForm({ onCancel, onSubmit, submitting, submitErro
             </div>
           </div>
 
-          <TextField
-            label="Monthly Rent (Rs.) *"
-            prefix="Rs."
-            type="number"
-            min="0"
-            placeholder="e.g. 12000"
-            value={form.rent}
-            onChange={(e) => set({ rent: e.target.value })}
-            onWheel={(e) => e.target.blur()}
-          />
+          <div>
+            <TextField
+              label="Monthly Rent (Rs.) *"
+              prefix="Rs."
+              type="number"
+              min="0"
+              placeholder="e.g. 12000"
+              value={form.rent}
+              onChange={(e) => set({ rent: e.target.value })}
+              onWheel={(e) => e.target.blur()}
+            />
+            {rentCapWarning && <p className="mt-1.5 text-xs font-semibold text-red-400">{rentCapWarning}</p>}
+          </div>
 
           <div>
             <SectionLabel>Furnishing *</SectionLabel>
@@ -231,6 +263,16 @@ export default function AddFlatForm({ onCancel, onSubmit, submitting, submitErro
           {submitting ? "Posting…" : "Proceed →"}
         </button>
       </div>
+
+      {showRentCapConfirm && (
+        <RentCapConfirmModal
+          rent={form.rent}
+          bhk={form.bhk}
+          cap={rentCap}
+          onReCheck={handleReCheckRent}
+          onConfirm={handleConfirmFlaggedRent}
+        />
+      )}
     </Modal>
   );
 }

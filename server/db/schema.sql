@@ -52,7 +52,8 @@ CREATE TABLE flats (
   smoker_ok TEXT, -- 'smoker'|'non_smoker' — only set when listing_type = 'flatmate'
   posted_at TIMESTAMP DEFAULT now(),
   is_seed BOOLEAN NOT NULL DEFAULT false, -- true only for seed.js's dummy listings, never set by the real POST /api/flats submission flow
-  report_count INT NOT NULL DEFAULT 0 -- materialized from flat_reports, same pattern as rating
+  report_count INT NOT NULL DEFAULT 0, -- materialized from flat_reports, same pattern as rating
+  rent_flagged BOOLEAN NOT NULL DEFAULT false -- owner-confirmed over-cap rent (AddFlatForm's RentCapConfirmModal); still visible on the map, excluded only from digestJob's ACTIVE_FLATS_SQL
 );
 
 CREATE INDEX idx_flats_status ON flats(status);
