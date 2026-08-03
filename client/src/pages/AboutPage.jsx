@@ -1,54 +1,172 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Info, ArrowLeft } from "lucide-react";
-import LegalModal from "../components/LegalModal.jsx";
 
-const PILL_CLASS =
-  "rounded-full border border-white/10 bg-surface-alt px-3.5 py-1.5 text-xs font-semibold text-text-primary transition hover:bg-white/5";
+const NAV_LINKS = [
+  { label: "Map", to: "/" },
+  { label: "About", to: "/about" },
+  { label: "Contact", to: "/contact" },
+  { label: "Privacy", to: "/privacy" },
+  { label: "Terms", to: "/termofuse" },
+];
 
-// Standalone route (not a modal) — same page shell as DeleteFlatPage.jsx.
-// Privacy Policy / Terms of Use reuse the exact same LegalModal already built
-// for LandingCard.jsx rather than duplicating their content here.
-export default function AboutPage() {
-  const [legalModal, setLegalModal] = useState(null); // 'privacy' | 'terms' | null
-
+// No shared header/nav/footer component exists elsewhere in this app yet
+// (every other page — DeleteFlatPage, ContactPage, Privacy/TermsOfUsePage —
+// uses its own plain "Back to map" link instead). Built directly here using
+// the app's existing color tokens for visual consistency; not extracted into
+// a shared component since nothing else needs a persistent nav bar yet.
+function NavBar() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg px-4 py-10">
-      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-surface p-6 shadow-2xl">
+    <nav className="border-b border-white/10">
+      <div className="flex w-full flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-4 sm:px-10">
         <Link
           to="/"
-          className="mb-5 inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted transition hover:text-text-primary"
+          className="text-base font-extrabold text-accent-purple-light transition hover:opacity-80"
         >
-          <ArrowLeft size={14} />
-          Back to map
+          Chitwan Rent
         </Link>
-
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-purple/20 text-accent-purple-light">
-            <Info size={18} />
-          </div>
-          <h1 className="text-lg font-bold text-text-primary">About</h1>
-        </div>
-
-        <p className="mt-4 text-sm text-text-muted">About content coming soon.</p>
-
-        <div className="mt-6 flex flex-wrap gap-2">
-          <button type="button" onClick={() => setLegalModal("privacy")} className={PILL_CLASS}>
-            Privacy Policy
-          </button>
-          <button type="button" onClick={() => setLegalModal("terms")} className={PILL_CLASS}>
-            Terms of Use
-          </button>
-          <Link to="/contact" className={PILL_CLASS}>
-            Contact
-          </Link>
-          <Link to="/" className={PILL_CLASS}>
-            Map
-          </Link>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          {NAV_LINKS.map((link) => (
+            <Link
+              key={link.to}
+              to={link.to}
+              className="text-sm font-semibold text-text-primary transition hover:opacity-70"
+            >
+              {link.label}
+            </Link>
+          ))}
         </div>
       </div>
+    </nav>
+  );
+}
 
-      {legalModal && <LegalModal type={legalModal} onClose={() => setLegalModal(null)} />}
+function Footer() {
+  return (
+    <footer className="border-t border-white/10 px-4 py-6 text-center text-xs text-text-muted sm:px-8">
+      &copy; {new Date().getFullYear()} Chitwan Rent
+    </footer>
+  );
+}
+
+function Section({ heading, children }) {
+  return (
+    <section className="mt-12 first:mt-0">
+      <h2 className="text-lg font-bold text-text-primary sm:text-xl">
+        {heading}
+      </h2>
+      <div className="mt-4 space-y-4 text-sm leading-relaxed text-text-muted sm:text-base">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+const PLATFORM_STEPS = [
+  {
+    title: "Renters share what they pay",
+    body: 'Anonymous "pin your rent" reports — no name attached, just a location and a number — build a real map of actual rents across Chitwan, as an honest counterweight to inflated asking prices.',
+  },
+  {
+    title: "Owners list flats directly",
+    body: "Drop a pin, enter flat details, verify by email. Zero broker fees, zero listing fees, zero commission. Listings are rate-limited and can be removed anytime with an emailed delete code.",
+  },
+  {
+    title: "Flat-hunters drop a seeker pin",
+    body: "Tell us your budget, area, and preferences. A weekly digest email connects seekers and owners within range automatically — no agents, no middlemen.",
+  },
+  {
+    title: "Spot a To-Let",
+    body: 'A gamified layer where anyone can photograph and pin "to-let" boards they spot around town, crowdsourcing listings that haven\'t been added yet.',
+  },
+];
+
+// Standalone route (not a modal). Content is factual/neutral throughout, not
+// the first-person voice used in this app's notification emails.
+export default function AboutPage() {
+  return (
+    <div
+      className="min-h-screen w-full bg-bg font-light"
+      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+    >
+      <NavBar />
+
+      <div className="mx-auto w-full max-w-3xl px-4 py-12 sm:px-8 sm:py-16">
+        <h1 className="text-2xl font-extrabold leading-tight text-text-primary sm:text-3xl">
+          About Chitwan Rent
+        </h1>
+        <p className="mt-4 text-sm leading-relaxed text-text-muted sm:text-base">
+          An anonymous, crowdsourced rent map for Chitwan district, Nepal. Real
+          prices from real renters. No brokers. No paywall. Free forever.
+        </p>
+
+        <Section heading="Why this exists">
+          <p>
+            Most rental listings people see are broker-quoted or landlord-set
+            asking prices — not what tenants actually pay. There's no public
+            source of truth for "what does this flat actually cost in this
+            area?"
+          </p>
+          <p>
+            Chitwan Rent flips that. Renters drop pins showing what they
+            actually pay. Every verified rent becomes the next renter's
+            reference point. No broker layer, no commercial gate — just
+            transparent data shared by the people who live here.
+          </p>
+        </Section>
+
+        <Section heading="How the platform works">
+          <ol className="space-y-6">
+            {PLATFORM_STEPS.map((step, i) => (
+              <li key={step.title} className="flex items-start gap-4">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-purple text-sm font-bold text-white">
+                  {i + 1}
+                </span>
+                <div>
+                  <p className="font-semibold text-text-primary">
+                    {step.title}
+                  </p>
+                  <p className="mt-1">{step.body}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </Section>
+
+        <Section heading="The tech (transparency)">
+          <p>
+            Chitwan Rent is built and maintained by Ashim, with help from
+            Claude, an AI coding assistant from Anthropic, used throughout
+            development.
+          </p>
+          <p>
+            Stack: React + Vite + Tailwind + react-leaflet on the frontend,
+            Express + PostgreSQL on the backend. No mobile app, no unnecessary
+            frameworks — the simplest approach that works.
+          </p>
+        </Section>
+
+        <Section heading="Mission, in one line">
+          <p className="text-lg font-semibold text-text-primary">
+            Make Chitwan's rental data as transparent as it should be.
+          </p>
+        </Section>
+
+        <p className="mt-16 text-sm italic leading-relaxed text-text-muted">
+          Shout-out to{" "}
+          <a
+            href="https://bengaluru.rent/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="not-italic text-accent-purple-light hover:underline"
+          >
+            bengaluru.rent
+          </a>{" "}
+          — their map-first, brokerage-free approach to rental transparency
+          inspired a lot of how Chitwan Rent works. Full credit to them for the
+          original concept.
+        </p>
+      </div>
+
+      <Footer />
     </div>
   );
 }

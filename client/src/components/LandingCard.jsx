@@ -122,7 +122,14 @@ export default function LandingCard({ onDismiss, areas = [] }) {
           <Link to="/how-to-use" onClick={onDismiss} className="text-accent-purple-light hover:underline">
             Learn how to use
           </Link>
-          . About &middot; Contact
+          .{" "}
+          <Link to="/about" className="text-accent-purple-light hover:underline">
+            About
+          </Link>{" "}
+          &middot;{" "}
+          <Link to="/contact" className="text-accent-purple-light hover:underline">
+            Contact
+          </Link>
         </p>
 
         <div className="mt-5 flex gap-2.5">
