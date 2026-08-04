@@ -86,9 +86,15 @@ export default function PrivacyPolicyPage() {
           <li>
             Listing a flat or dropping a seeker pin: your email and/or phone (used only to sign you in — see "How
             sign-in works" below), plus the listing/preference details you fill in (rent, BHK, furnishing, gated
-            society, budget, move-in date, and similar fields).
+            society, budget, move-in date, and similar fields). Rent is automatically checked against a typical
+            range for the flat's BHK; if it's unusually high, listing still goes through but the flat is flagged
+            and excluded from weekly matching — see "Rent-cap flagging" in our Terms of Use.
           </li>
-          <li>"I'm interested" on a flat: your name, a contact method, and an optional note.</li>
+          <li>
+            "I'm interested" on a flat: your email and phone (used to sign you in — see "How sign-in works" below),
+            plus whatever optional details you add — a note, move-in timeline, gender, and parking needs (including
+            number of spots, if given).
+          </li>
           <li>Comments on a flat's detail panel: shown publicly under the name tied to your account.</li>
           <li>
             Reporting a listing: an optional written reason. We never show your identity to the listing's owner or
@@ -128,17 +134,21 @@ export default function PrivacyPolicyPage() {
           <li>Sending email: Gmail, via our own chitwanrent@gmail.com account.</li>
         </Ul>
         <P>
-          We do not use Google Maps, Google AdSense, Google Analytics, or any advertising or tracking cookies, and we
-          do not collect your IP address.
+          We do not use Google Maps, Google AdSense, Google Analytics, or any advertising or tracking cookies. We
+          don't collect your IP address anywhere in the public app — the only IP logging anywhere in our systems is
+          on our own internal operator tool's login page (not user-facing), purely to block repeated password
+          guesses.
         </P>
 
         <H>Who can actually see your contact details</H>
         <P>
-          Your email and phone are never displayed in the app's normal interface. The one place we deliberately send
-          them onward is the weekly match-digest email — to one compatible seeker or flat owner within 2km of your pin
-          (see "How matching works" in our Terms of Use). That said, like most public listing platforms, the map's
-          underlying data isn't access-controlled field-by-field, so treat anything you submit as visible to a
-          technically determined party, not only to matched users.
+          Your email and phone are never displayed in the app's normal interface. We deliberately send them onward
+          in two cases: the weekly match-digest email (to one compatible seeker or flat owner within 2km of your pin
+          — see "How matching works" in our Terms of Use), and, separately, if you tap "I'm interested" on a flat —
+          your contact details go straight to that flat's owner by email, regardless of distance or match
+          compatibility. That said, like most public listing platforms, the map's underlying data isn't
+          access-controlled field-by-field, so treat anything you submit as visible to a technically determined
+          party, not only to matched users.
         </P>
 
         <H>Photos</H>
