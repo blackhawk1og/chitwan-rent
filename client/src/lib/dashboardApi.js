@@ -29,6 +29,10 @@ export const dashboardApi = {
   logout: () => request("/logout", { method: "POST" }),
 
   getListings: (status) => request(`/listings${status ? `?status=${encodeURIComponent(status)}` : ""}`),
+  // Operator override, no code — distinct from the owner-facing
+  // postJson(`/flats/${id}/delete`, { code }) flow in lib/api.js used by
+  // DeleteFlatPage.jsx, which this doesn't touch.
+  deleteListing: (id) => request(`/listings/${id}`, { method: "DELETE" }),
   getReports: () => request("/reports"),
   getDigestHealth: () => request("/digest-health"),
   getRateLimitLookup: (q) => request(`/rate-limit-lookup?q=${encodeURIComponent(q)}`),

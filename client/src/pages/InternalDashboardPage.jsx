@@ -6,6 +6,7 @@ import { dashboardApi } from "../lib/dashboardApi.js";
 import { formatRs, formatRelativeTime, bhkLabel } from "../lib/format.js";
 import TextField from "../components/ui/TextField.jsx";
 import Pill from "../components/ui/Pill.jsx";
+import Modal from "../components/Modal.jsx";
 
 // Internal-only tool (see Step 0 notes in this feature's PR): route is
 // /internal/dashboard specifically because it's not obviously guessable and
@@ -205,6 +206,77 @@ const STATUS_FILTERS = [
   { value: "rented", label: "Rented" },
 ];
 
+// Per-row operator override — distinct from, and doesn't touch, the
+// owner-facing /deleteflat 10-digit-code flow (DeleteFlatPage.jsx). Requires
+// an explicit second click on "Confirm" (not a single accidental tap) before
+// the DELETE actually fires; "Cancel" backs out with no request made.
+function DeleteFlatButton({ flatId, onDeleted }) {
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleConfirm = async () => {
+    setDeleting(true);
+    setError(null);
+    try {
+      await dashboardApi.deleteListing(flatId);
+      onDeleted();
+    } catch (err) {
+      setError(err.message || "Failed to delete flat");
+      setDeleting(false);
+    }
+  };
+
+  // Backdrop/X click reuses the same Cancel behavior — closes with no
+  // request sent — but is ignored mid-delete so a stray click can't dismiss
+  // the modal while the request is still in flight.
+  const handleClose = () => {
+    if (!deleting) setConfirming(false);
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        aria-label={`Delete flat ${flatId}`}
+        className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-text-muted transition hover:bg-red-500/10 hover:text-red-400"
+      >
+        <Trash2 size={13} />
+        Delete
+      </button>
+
+      {confirming && (
+        <Modal onClose={handleClose} maxWidthClass="max-w-sm">
+          <h2 className="pr-8 text-lg font-bold text-text-primary">Delete flat {flatId}?</h2>
+          <p className="mt-2 text-sm text-text-muted">This cannot be undone.</p>
+
+          {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+
+          <div className="mt-5 flex gap-3">
+            <button
+              type="button"
+              onClick={handleClose}
+              disabled={deleting}
+              className="flex-1 rounded-full border border-white/10 bg-surface-alt py-2.5 text-sm font-bold text-text-primary transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirm}
+              disabled={deleting}
+              className="flex-1 rounded-full bg-red-500 py-2.5 text-sm font-bold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {deleting ? "Deleting…" : "Confirm"}
+            </button>
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+}
+
 function RecentListingsSection() {
   const [status, setStatus] = useState("");
   const listingsQuery = useQuery({
@@ -239,6 +311,11 @@ function RecentListingsSection() {
               // Feeds straight into the delete-user search above/below it —
               // deliberately email, not phone (out of scope for this table).
               { key: "owner_email", label: "Owner email", render: (r) => r.owner_email ?? "—" },
+              {
+                key: "actions",
+                label: "Actions",
+                render: (r) => <DeleteFlatButton flatId={r.id} onDeleted={() => listingsQuery.refetch()} />,
+              },
             ]}
             rows={listingsQuery.data ?? []}
           />

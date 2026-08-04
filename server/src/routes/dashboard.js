@@ -97,6 +97,35 @@ router.get("/listings", async (req, res) => {
   }
 });
 
+// DELETE /listings/:id — per-row operator override for a single flat, from
+// the Recent listings table. Deliberately separate from, and doesn't touch,
+// routes/flats.js's public POST /:id/delete (the owner-facing 10-digit-code
+// flow behind /deleteflat) — this one has no code, since the dashboard's own
+// password + session is the access control here, not the code. Removes
+// exactly one flat; leaves the owning user and every other flat/seeker pin
+// of theirs untouched. Relies on the same DB-level ON DELETE CASCADE every
+// other hard flat-delete in this app already relies on (flat_ratings/
+// flat_comments/flat_reports/flat_interests/flat_delete_attempts/matches —
+// see schema.sql and db/add-*.js) rather than reimplementing that cascade.
+router.delete("/listings/:id", async (req, res) => {
+  const flatId = Number(req.params.id);
+  if (!Number.isInteger(flatId)) {
+    return res.status(400).json({ error: "Invalid flat id" });
+  }
+
+  try {
+    const result = await query("DELETE FROM flats WHERE id = $1 RETURNING id", [flatId]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Flat not found" });
+    }
+    console.log(`Dashboard: flat ${flatId} deleted (operator override, no code).`);
+    res.json({ ok: true, flatId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete flat" });
+  }
+});
+
 // --- 2. Reports ----------------------------------------------------------
 router.get("/reports", async (req, res) => {
   try {
