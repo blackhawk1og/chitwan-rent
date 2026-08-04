@@ -1,6 +1,6 @@
 import { Routes, Route } from "react-router-dom";
 import MapShell from "./components/MapShell.jsx";
-import DeleteFlatPage from "./pages/DeleteFlatPage.jsx";
+import FlatStatusPage from "./pages/FlatStatusPage.jsx";
 import AboutPage from "./pages/AboutPage.jsx";
 import ContactPage from "./pages/ContactPage.jsx";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage.jsx";
@@ -13,7 +13,10 @@ export default function App() {
     <>
       <ScrollToTop />
       <Routes>
-        <Route path="/deleteflat" element={<DeleteFlatPage />} />
+        {/* Replaces the old /deleteflat + DeleteFlatPage.jsx — a single
+            code-verified entry point for both "mark as rented" and "delete",
+            not two live routes for overlapping owner actions. */}
+        <Route path="/flatstatus" element={<FlatStatusPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />

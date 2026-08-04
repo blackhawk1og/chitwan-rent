@@ -128,6 +128,7 @@ function Dashboard({ onLoggedOut }) {
         <div className="mt-8 space-y-6">
           <RecentListingsSection />
           <ReportsSection />
+          <InterestsSection />
           <DigestHealthSection />
           <RateLimitLookupSection />
           <DataHygieneSection />
@@ -207,7 +208,7 @@ const STATUS_FILTERS = [
 ];
 
 // Per-row operator override — distinct from, and doesn't touch, the
-// owner-facing /deleteflat 10-digit-code flow (DeleteFlatPage.jsx). Requires
+// owner-facing /flatstatus 10-digit-code flow (FlatStatusPage.jsx). Requires
 // an explicit second click on "Confirm" (not a single accidental tap) before
 // the DELETE actually fires; "Cancel" backs out with no request made.
 function DeleteFlatButton({ flatId, onDeleted }) {
@@ -380,6 +381,49 @@ function ReportsSection() {
             no way to know their true outcome — shown as "unknown (removed before this was tracked)", not guessed.
           </p>
         </>
+      )}
+    </SectionCard>
+  );
+}
+
+// --- Interests --------------------------------------------------------
+// The only place any of this is visible outside a raw SQL query — see this
+// feature's own investigation task, which found flat_interests was a
+// complete dead end before this section existed (data saved, nobody ever
+// saw it). Shows actual submission content, not just a count.
+const INTEREST_MOVE_IN_LABELS = { asap: "ASAP", next_month: "Next month", flexible: "Flexible" };
+const INTEREST_GENDER_LABELS = { male: "Male", female: "Female", other: "Other" };
+
+function InterestsSection() {
+  const interestsQuery = useQuery({ queryKey: ["dashboard-interests"], queryFn: dashboardApi.getInterests });
+
+  return (
+    <SectionCard title="Interests" subtitle={'"I\'m interested" submissions from the flat detail panel, most recent first.'}>
+      {interestsQuery.isLoading ? (
+        <p className="text-sm text-text-muted">Loading…</p>
+      ) : interestsQuery.isError ? (
+        <p className="text-sm text-red-400">{interestsQuery.error.message}</p>
+      ) : (
+        <Table
+          columns={[
+            { key: "flat_id", label: "Flat ID" },
+            { key: "contact", label: "Contact" },
+            { key: "move_in", label: "Move-in", render: (r) => (r.move_in ? INTEREST_MOVE_IN_LABELS[r.move_in] ?? r.move_in : "—") },
+            { key: "gender", label: "They are", render: (r) => (r.gender ? INTEREST_GENDER_LABELS[r.gender] ?? r.gender : "—") },
+            {
+              key: "parking_required",
+              label: "Parking",
+              render: (r) =>
+                r.parking_required === true
+                  ? `Required${Number.isFinite(r.parking_count) ? ` (${r.parking_count})` : ""}`
+                  : "—",
+            },
+            { key: "note", label: "Note", render: (r) => r.note || "—" },
+            { key: "created_at", label: "Submitted", render: (r) => `${formatRelativeTime(r.created_at)} ago` },
+          ]}
+          rows={interestsQuery.data ?? []}
+          emptyLabel="No interest submissions yet."
+        />
       )}
     </SectionCard>
   );

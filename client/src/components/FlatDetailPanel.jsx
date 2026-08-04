@@ -196,10 +196,18 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
     setInterestSubmitError(false);
     try {
       await login({ email: form.email, phone: form.phone });
+      // "name" removed from InterestForm.jsx — nothing here substitutes for
+      // it (flat_interests.name simply stays unpopulated going forward, see
+      // routes/flats.js's POST /:id/interest). move_in/gender/parking_
+      // required are InterestForm's newer optional fields, passed straight
+      // through under the snake_case keys the server route expects.
       await flatInterest.mutateAsync({
-        name: form.name,
         contact: `${form.email} / ${form.phone}`,
         note: form.note,
+        move_in: form.moveIn,
+        gender: form.gender,
+        parking_required: form.parkingRequired,
+        parking_count: form.parkingCount,
       });
       setInterestFormOpen(false);
       setInterestSent(true);
@@ -357,8 +365,7 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-bold text-text-primary">I'm interested in this flat</div>
                   <div className="mt-0.5 text-xs text-text-muted">
-                    Share your preferences — we'll email the owner with your details and also match you against other
-                    nearby flats.
+                    Share your preferences — we'll email the owner with your details directly.
                   </div>
                 </div>
                 <ArrowRight size={18} className="shrink-0 text-accent-teal" />

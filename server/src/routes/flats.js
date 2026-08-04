@@ -3,12 +3,9 @@ import { query } from "../db.js";
 import { isNearAnyRoute, isWithinChitwanBounds } from "../lib/geo.js";
 import { requireAuth } from "../lib/auth.js";
 import { generateVerificationToken } from "../lib/verification.js";
-import { sendVerificationEmail, sendReportRemovalEmail } from "../lib/email.js";
+import { sendVerificationEmail, sendReportRemovalEmail, sendInterestNotificationEmail } from "../lib/email.js";
 import { checkListingRateLimit, recordListingAttempt } from "../lib/listingRateLimit.js";
-import { hashDeleteCode, deleteCodeHashMatches } from "../lib/deleteCode.js";
-import { checkDeleteAttemptLimit, recordFailedDeleteAttempt } from "../lib/deleteAttemptLimit.js";
-
-const DELETE_ELIGIBILITY_DELAY_MS = 24 * 60 * 60 * 1000;
+import { verifyFlatDeleteCode } from "../lib/flatCodeVerification.js";
 
 // Mirrors the GET /'s own inline `f.report_count < 3` filter below — that's
 // the actual (passive, read-time) removal mechanism, there's no discrete
@@ -61,6 +58,16 @@ router.get("/", async (req, res) => {
   // above, not tied to the status filter, so this holds even when no status
   // filter is requested at all (the map's default fetch).
   conditions.push(`f.status != 'pending_verification'`);
+  // Confirmed gap (this feature's own Step 0 finding): before this line
+  // existed, the map's default/unfiltered fetch sent no status param at all
+  // (see client's DEFAULT_FILTERS.availableOnly = false in lib/filters.js),
+  // so a flat the owner marked as rented via POST /:id/mark-rented rendered
+  // as a completely ordinary live pin — nothing on the client reads
+  // flat.status for marker styling. Same unconditional treatment as
+  // pending_verification above rather than new marker-styling logic: a
+  // rented flat simply shouldn't be visible under any filter combination,
+  // same reasoning as the report_count rule two lines up.
+  conditions.push(`f.status != 'rented'`);
 
   if (status) {
     params.push(status);
@@ -446,21 +453,67 @@ router.post("/:id/report", requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/flats/:id/interest  { name, contact, note }
+// POST /api/flats/:id/interest  { contact, note?, move_in?, gender?, parking_required?, parking_count? }
+// "name" was removed from InterestForm.jsx (see that form's own comments) —
+// flat_interests.name stays in the table (already nullable at the DB level,
+// no migration needed) but is simply never populated by this route anymore.
 router.post("/:id/interest", requireAuth, async (req, res) => {
-  const { name, contact, note } = req.body;
-  if (!name?.trim() || !contact?.trim()) {
-    return res.status(400).json({ error: "Name and contact are required" });
+  const { contact, note, move_in, gender, parking_required, parking_count } = req.body;
+  if (!contact?.trim()) {
+    return res.status(400).json({ error: "Contact is required" });
   }
+
+  // Only trusted as meaningful when parking_required is actually true —
+  // matches InterestForm.jsx only ever sending a non-null parking_count
+  // alongside parking_required: true, but not relying on the client alone
+  // to enforce that pairing. parking_count == null (covers both null and
+  // undefined) is checked first since Number(null) is 0, not NaN — without
+  // this it would silently turn "not specified" into a real 0.
+  const parkingCountNum =
+    parking_count != null && Number.isFinite(Number(parking_count)) && parking_required === true
+      ? Number(parking_count)
+      : null;
 
   try {
     const result = await query(
-      `INSERT INTO flat_interests (flat_id, user_id, name, contact, note)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO flat_interests (flat_id, user_id, contact, note, move_in, gender, parking_required, parking_count)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [req.params.id, req.userId, name.trim(), contact.trim(), note?.trim() || null]
+      [
+        req.params.id, req.userId, contact.trim(), note?.trim() || null,
+        move_in ?? null, gender ?? null, parking_required ?? null, parkingCountNum,
+      ]
     );
-    res.status(201).json(result.rows[0]);
+    const interest = result.rows[0];
+
+    // The CTA on FlatDetailPanel.jsx promises this ("we'll email the
+    // owner") — never let a failed send turn an already-recorded interest
+    // into an error response, same log-and-continue contract as every other
+    // email in this app.
+    try {
+      const ownerResult = await query(
+        "SELECT u.email AS owner_email FROM flats f LEFT JOIN users u ON u.id = f.owner_id WHERE f.id = $1",
+        [req.params.id]
+      );
+      const ownerEmail = ownerResult.rows[0]?.owner_email;
+      if (ownerEmail) {
+        await sendInterestNotificationEmail({
+          to: ownerEmail,
+          flatId: req.params.id,
+          contact: interest.contact,
+          note: interest.note,
+          moveIn: interest.move_in,
+          gender: interest.gender,
+          parkingRequired: interest.parking_required,
+          parkingCount: interest.parking_count,
+        });
+        console.log(`Interest notification email sent: flat ${req.params.id}`);
+      }
+    } catch (emailErr) {
+      console.error(`Interest notification email failed: flat ${req.params.id}`, emailErr.message);
+    }
+
+    res.status(201).json(interest);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to submit interest" });
@@ -471,52 +524,16 @@ router.post("/:id/interest", requireAuth, async (req, res) => {
 // code emailed at verification time (see lib/verification.js) is the
 // credential here, consistent with this app's login-free find-or-create
 // auth; deleting does NOT reset or interact with the listing rate limit
-// (see lib/listingRateLimit.js) in any way.
+// (see lib/listingRateLimit.js) in any way. Code check itself lives in
+// lib/flatCodeVerification.js, shared with POST /:id/mark-rented below —
+// this route's own job is only what happens after a verified match.
 router.post("/:id/delete", async (req, res) => {
   const flatId = req.params.id;
-  const code = typeof req.body.code === "string" ? req.body.code.trim() : "";
-
-  if (!/^\d{10}$/.test(code)) {
-    return res.status(400).json({ error: "Code must be a 10-digit number" });
-  }
 
   try {
-    const result = await query(
-      "SELECT id, email_verified_at, delete_code_hash FROM flats WHERE id = $1",
-      [flatId]
-    );
-    if (result.rows.length === 0) {
-      console.log(`Delete attempt failed on wrong code: flat ${flatId}`);
-      return res.status(400).json({ error: "Flat ID or code is incorrect" });
-    }
-
-    const flat = result.rows[0];
-
-    // Eligibility is a business rule, not a security boundary, so — per
-    // spec — it's checked before the code at all, and is fine to answer
-    // with a specific reason rather than the generic wrong-ID-or-code
-    // message below. No email_verified_at at all (e.g. seed/dummy data,
-    // which never goes through verification) collapses into the same
-    // "not eligible" branch, just without a date to name.
-    const eligibleAt = flat.email_verified_at ? new Date(flat.email_verified_at).getTime() + DELETE_ELIGIBILITY_DELAY_MS : null;
-    if (!eligibleAt || eligibleAt > Date.now()) {
-      console.log(`Delete attempt rejected as not-yet-eligible: flat ${flatId}`);
-      return res.status(400).json({
-        error: eligibleAt
-          ? `This listing can be deleted starting ${new Date(eligibleAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}, 24 hours after verification.`
-          : "This listing isn't eligible for deletion yet.",
-      });
-    }
-
-    const attemptLimit = await checkDeleteAttemptLimit(flatId);
-    if (!attemptLimit.allowed) {
-      return res.status(429).json({ error: "Too many incorrect attempts. Please try again later." });
-    }
-
-    if (!deleteCodeHashMatches(hashDeleteCode(code), flat.delete_code_hash)) {
-      await recordFailedDeleteAttempt(flatId);
-      console.log(`Delete attempt failed on wrong code: flat ${flatId}`);
-      return res.status(400).json({ error: "Flat ID or code is incorrect" });
+    const verification = await verifyFlatDeleteCode(flatId, req.body.code);
+    if (!verification.ok) {
+      return res.status(verification.status).json({ error: verification.error });
     }
 
     // Hard delete, same as the expired-listing cleanup job — flat_ratings,
@@ -529,6 +546,32 @@ router.post("/:id/delete", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to delete flat" });
+  }
+});
+
+// POST /api/flats/:id/mark-rented  { code }  — same no-auth, code-is-the-
+// credential shape as POST /:id/delete right above, and the exact same
+// verifyFlatDeleteCode check (format, 24h eligibility, brute-force limit,
+// hashed comparison) rather than a re-implementation of it. Soft: sets
+// status = 'rented' instead of hard-deleting, so the listing's history
+// (ratings/comments/reports/interests) survives — GET /'s own status != '
+// rented' condition (added alongside this route) is what actually takes it
+// off the live map.
+router.post("/:id/mark-rented", async (req, res) => {
+  const flatId = req.params.id;
+
+  try {
+    const verification = await verifyFlatDeleteCode(flatId, req.body.code);
+    if (!verification.ok) {
+      return res.status(verification.status).json({ error: verification.error });
+    }
+
+    const result = await query("UPDATE flats SET status = 'rented' WHERE id = $1 RETURNING id, status", [flatId]);
+    console.log(`Flat marked as rented: flat ${flatId}`);
+    res.json({ ok: true, status: result.rows[0].status });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to mark flat as rented" });
   }
 });
 

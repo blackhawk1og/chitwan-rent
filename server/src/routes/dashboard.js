@@ -100,7 +100,7 @@ router.get("/listings", async (req, res) => {
 // DELETE /listings/:id — per-row operator override for a single flat, from
 // the Recent listings table. Deliberately separate from, and doesn't touch,
 // routes/flats.js's public POST /:id/delete (the owner-facing 10-digit-code
-// flow behind /deleteflat) — this one has no code, since the dashboard's own
+// flow behind /flatstatus) — this one has no code, since the dashboard's own
 // password + session is the access control here, not the code. Removes
 // exactly one flat; leaves the owning user and every other flat/seeker pin
 // of theirs untouched. Relies on the same DB-level ON DELETE CASCADE every
@@ -392,6 +392,30 @@ router.post("/users/:id/delete", async (req, res) => {
     if (err.status === 404) return res.status(404).json({ error: err.message });
     console.error(err);
     res.status(500).json({ error: "Failed to delete user" });
+  }
+});
+
+// --- 7. Interests ----------------------------------------------------
+// GET /interests — the only real visibility into flat_interests anywhere in
+// this app before now (see this feature's own investigation task): actual
+// submission content, not just the delete-user cascade count section 6
+// already showed. Its own top-level section rather than folded into Recent
+// listings — an interest is a submission about a listing, not a listing
+// itself, and one flat can have many.
+router.get("/interests", async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT fi.id, fi.flat_id, fi.contact, fi.note, fi.move_in, fi.gender, fi.parking_required, fi.parking_count, fi.created_at,
+              f.bhk, f.rent, f.status
+       FROM flat_interests fi
+       LEFT JOIN flats f ON f.id = fi.flat_id
+       ORDER BY fi.created_at DESC
+       LIMIT 200`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch interests" });
   }
 });
 

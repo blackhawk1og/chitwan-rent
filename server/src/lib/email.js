@@ -166,8 +166,8 @@ function deleteCodeEmailHtml({ flatId, code }) {
 
                 <p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:#374151;">
                   Your flat listing (ID <strong>${flatId}</strong>) is now verified and live. Keep this code —
-                  it's the only way to permanently remove this listing later, at
-                  <strong>chitwan.rent/deleteflat</strong>.
+                  it's what you'll need to mark it as rented or remove it later, at
+                  <strong>chitwan.rent/flatstatus</strong>.
                 </p>
 
                 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 20px;">
@@ -305,6 +305,99 @@ export async function sendReportRemovalEmail({ to, flatId, reportCount, reasons 
     to,
     subject: "Your Chitwan Rent listing was removed",
     html: reportRemovalEmailHtml({ flatId, reportCount, reasons }),
+  });
+}
+
+// gender here is InterestForm.jsx's own "You are" field — same vocabulary
+// as seeker_pins.gender, not flats.flatmate_gender_pref (a preference for
+// others, not an identity) — see that form's comments for the distinction.
+const INTEREST_GENDER_LABELS = { male: "Male", female: "Female", other: "Other" };
+
+// formatMoveIn is defined further down this file — safe to call here despite
+// the earlier position: `function` declarations are hoisted module-wide in
+// JS, so call-site order doesn't matter, only that both live in this module.
+function interestDetailRowsHtml({ moveIn, gender, parkingRequired, parkingCount, note }) {
+  const rows = [];
+  if (moveIn) {
+    rows.push(`<p style="margin:0 0 8px;font-size:13px;color:#374151;"><strong>Move-in:</strong> ${escapeHtml(formatMoveIn(moveIn))}</p>`);
+  }
+  if (gender && INTEREST_GENDER_LABELS[gender]) {
+    rows.push(`<p style="margin:0 0 8px;font-size:13px;color:#374151;"><strong>They are:</strong> ${escapeHtml(INTEREST_GENDER_LABELS[gender])}</p>`);
+  }
+  // Only stated when explicitly true — parkingRequired can be false
+  // ("No preference" selected) or null (never touched); neither is worth a
+  // line in the email, same as every other optional field here being
+  // omitted rather than shown as "Not specified". parkingCount only ever
+  // has a real value alongside parkingRequired === true (see routes/
+  // flats.js's own parkingCountNum guard), so it's fine to check it alone.
+  if (parkingRequired === true) {
+    const spotsLabel = Number.isFinite(parkingCount) ? ` (${parkingCount} spot${parkingCount === 1 ? "" : "s"})` : "";
+    rows.push(`<p style="margin:0 0 8px;font-size:13px;color:#374151;"><strong>Parking:</strong> Required${spotsLabel}</p>`);
+  }
+  if (note) {
+    rows.push(`<p style="margin:0;font-size:13px;color:#374151;"><strong>Note:</strong> ${escapeHtml(note)}</p>`);
+  }
+  return rows.join("");
+}
+
+function interestNotificationEmailHtml({ flatId, contact, note, moveIn, gender, parkingRequired, parkingCount }) {
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background-color:#f4f4f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f7;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+            <tr>
+              <td style="background-color:${BRAND_PURPLE};padding:24px 32px;">
+                <span style="color:#ffffff;font-size:18px;font-weight:700;">Chitwan Rent</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px 32px 8px;">
+                <h1 style="margin:0 0 16px;font-size:20px;color:#111827;">Someone's interested in your listing</h1>
+
+                <p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:#374151;">
+                  A seeker tapped "I'm interested" on your flat listing (ID <strong>${flatId}</strong>). Here's
+                  what they shared — there's no in-app messaging on Chitwan Rent, so reach out directly.
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 20px;">
+                  <tr>
+                    <td style="border-radius:12px;background-color:#f4f4f7;padding:16px 18px;">
+                      <p style="margin:0 0 8px;font-size:13px;color:#374151;"><strong>Contact:</strong> ${escapeHtml(contact)}</p>
+                      ${interestDetailRowsHtml({ moveIn, gender, parkingRequired, parkingCount, note })}
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 32px 28px;">
+                <p style="margin:0;font-size:12px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:16px;">
+                  This is an automated notice — no action is needed unless you'd like to reach out.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+// Fired once per interest submission (see POST /:id/interest in
+// routes/flats.js), right after the flat_interests row is inserted. Same
+// throw-on-failure, log-and-continue contract as every other send*Email
+// function here — a failed send never turns a successful interest
+// submission into an error response.
+export async function sendInterestNotificationEmail({ to, flatId, contact, note, moveIn, gender, parkingRequired, parkingCount }) {
+  await transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to,
+    subject: "Someone's interested in your Chitwan Rent listing",
+    html: interestNotificationEmailHtml({ flatId, contact, note, moveIn, gender, parkingRequired, parkingCount }),
   });
 }
 
