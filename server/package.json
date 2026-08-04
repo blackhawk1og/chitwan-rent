@@ -30,7 +30,8 @@
     "add:users-is-seed": "node db/add-users-is-seed.js",
     "add:hero-nickname": "node db/add-hero-nickname.js",
     "add:seeker-pins-archived-at": "node db/add-seeker-pins-archived-at.js",
-    "add:dashboard-tables": "node db/add-dashboard-tables.js"
+    "add:dashboard-tables": "node db/add-dashboard-tables.js",
+    "add:flats-report-removal-email-sent-at": "node db/add-flats-report-removal-email-sent-at.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

@@ -20,6 +20,16 @@ const DELETE_ELIGIBILITY_DELAY_MS = 24 * 60 * 60 * 1000;
 // without hand-copying the number.
 export const REPORT_REMOVAL_THRESHOLD = 3;
 
+// The exact moment db/add-flats-report-removal-email-sent-at.js's migration
+// ran (captured from that migration's own `SELECT now()` output at the time
+// it was applied) — the dashboard's Reports section uses this to tell
+// "genuinely didn't send" apart from "predates this column entirely" for a
+// flat whose report_removal_email_sent_at is null: if the report that
+// crossed REPORT_REMOVAL_THRESHOLD happened before this moment, tracking
+// simply didn't exist yet and null carries no information either way; if it
+// happened after, the column was live and a null means the send failed.
+export const REPORT_REMOVAL_EMAIL_TRACKING_STARTED_AT = "2026-08-04T11:51:48.053Z";
+
 // Base URL for the link a verification email points at — see
 // routes/verifyListing.js, mounted at this same origin's /verify-listing.
 const SERVER_BASE_URL = process.env.SERVER_BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
@@ -412,6 +422,17 @@ router.post("/:id/report", requireAuth, async (req, res) => {
             reasons: reasonsResult.rows.map((r) => r.reason),
           });
           console.log(`Report-removal email sent: flat ${flatId}`);
+
+          // Only reached after sendReportRemovalEmail resolves without
+          // throwing — a failed send (caught below) never reaches this line,
+          // so the column stays null exactly when the send didn't actually
+          // succeed. Its own failure is logged and swallowed separately so a
+          // DB hiccup here can't turn an already-sent email into a 500.
+          try {
+            await query("UPDATE flats SET report_removal_email_sent_at = now() WHERE id = $1", [flatId]);
+          } catch (trackingErr) {
+            console.error(`Failed to record report-removal email timestamp: flat ${flatId}`, trackingErr.message);
+          }
         }
       } catch (emailErr) {
         console.error(`Report-removal email failed: flat ${flatId}`, emailErr.message);

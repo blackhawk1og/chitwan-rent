@@ -245,6 +245,15 @@ function RecentListingsSection() {
 }
 
 // --- 2. Reports ------------------------------------------------------------
+// removalEmailSent is either an ISO timestamp (flats.report_removal_email_
+// sent_at, when the send is confirmed) or one of three fixed labels from
+// routes/dashboard.js ("n/a — below threshold", "not sent", "unknown
+// (removed before this was tracked)") — this tells the two apart so a real
+// timestamp renders as relative time instead of a raw ISO string.
+function isIsoTimestamp(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(new Date(value).getTime());
+}
+
 function ReportsSection() {
   const reportsQuery = useQuery({ queryKey: ["dashboard-reports"], queryFn: dashboardApi.getReports });
 
@@ -265,7 +274,18 @@ function ReportsSection() {
                 label: "Auto-removed",
                 render: (r) => (r.hitRemovalThreshold ? <span className="text-red-400">Yes (≥3)</span> : "No"),
               },
-              { key: "removalEmailSent", label: "Removal email" },
+              {
+                key: "removalEmailSent",
+                label: "Removal email",
+                render: (r) =>
+                  isIsoTimestamp(r.removalEmailSent) ? (
+                    <span className="text-accent-teal">Sent {formatRelativeTime(r.removalEmailSent)} ago</span>
+                  ) : r.removalEmailSent === "not sent" ? (
+                    <span className="text-red-400">Not sent</span>
+                  ) : (
+                    r.removalEmailSent
+                  ),
+              },
               { key: "status", label: "Status" },
               { key: "bhk", label: "BHK", render: (r) => bhkLabel(r.bhk) },
               { key: "rent", label: "Rent", render: (r) => formatRs(r.rent) },
@@ -275,8 +295,8 @@ function ReportsSection() {
           />
           <p className="mt-3 flex items-start gap-1.5 text-xs text-text-muted">
             <AlertTriangle size={13} className="mt-0.5 shrink-0 text-accent-orange" />
-            Gap: whether the report-removal owner-notification email actually sent isn't persisted anywhere in the
-            DB (routes/flats.js only console.logs it) — shown as "unknown", not guessed.
+            Remaining gap: flats that crossed the threshold before flats.report_removal_email_sent_at existed have
+            no way to know their true outcome — shown as "unknown (removed before this was tracked)", not guessed.
           </p>
         </>
       )}

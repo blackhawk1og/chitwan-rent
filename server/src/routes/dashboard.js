@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { query, withTransaction } from "../db.js";
 import { ACTIVE_FLATS_SQL, ACTIVE_SEEKERS_SQL } from "../lib/digestJob.js";
-import { REPORT_REMOVAL_THRESHOLD } from "./flats.js";
+import { REPORT_REMOVAL_THRESHOLD, REPORT_REMOVAL_EMAIL_TRACKING_STARTED_AT } from "./flats.js";
 import { WINDOW_HOURS as LISTING_RATE_LIMIT_WINDOW_HOURS } from "../lib/listingRateLimit.js";
 import {
   issueDashboardSession,
@@ -92,22 +92,57 @@ router.get("/listings", async (req, res) => {
 router.get("/reports", async (req, res) => {
   try {
     const result = await query(
-      `SELECT id, status, bhk, rent, posted_at, is_seed, report_count
+      `SELECT id, status, bhk, rent, posted_at, is_seed, report_count, report_removal_email_sent_at
        FROM flats
        WHERE report_count > 0
        ORDER BY report_count DESC, posted_at DESC`
     );
-    const rows = result.rows.map((r) => ({
-      ...r,
-      hitRemovalThreshold: r.report_count >= REPORT_REMOVAL_THRESHOLD,
-      // routes/flats.js's POST /:id/report only console.logs whether
-      // sendReportRemovalEmail succeeded — nothing persists that outcome
-      // anywhere in the DB. Surfaced honestly as unknown rather than guessed.
-      removalEmailSent:
-        r.report_count >= REPORT_REMOVAL_THRESHOLD
-          ? "unknown — not tracked in DB"
-          : "n/a — below threshold",
-    }));
+
+    // For rows that crossed the threshold but have no recorded send
+    // timestamp, the null is ambiguous by itself: it means either "the send
+    // genuinely failed" (tracking existed, nothing came back) or "this flat
+    // crossed before report_removal_email_sent_at existed at all" (see
+    // routes/flats.js's REPORT_REMOVAL_EMAIL_TRACKING_STARTED_AT). Resolving
+    // that requires knowing exactly when the flat crossed the threshold —
+    // the created_at of its Nth report (N = REPORT_REMOVAL_THRESHOLD), which
+    // is the same report that triggered (or would have triggered) the send.
+    const ambiguousIds = result.rows
+      .filter((r) => r.report_count >= REPORT_REMOVAL_THRESHOLD && !r.report_removal_email_sent_at)
+      .map((r) => r.id);
+
+    let crossedAtByFlatId = new Map();
+    if (ambiguousIds.length > 0) {
+      const crossedResult = await query(
+        `SELECT flat_id, created_at FROM (
+           SELECT flat_id, created_at, ROW_NUMBER() OVER (PARTITION BY flat_id ORDER BY created_at ASC) AS rn
+           FROM flat_reports
+           WHERE flat_id = ANY($1::int[])
+         ) ranked
+         WHERE rn = $2`,
+        [ambiguousIds, REPORT_REMOVAL_THRESHOLD]
+      );
+      crossedAtByFlatId = new Map(crossedResult.rows.map((r) => [r.flat_id, r.created_at]));
+    }
+
+    const trackingStartedAt = new Date(REPORT_REMOVAL_EMAIL_TRACKING_STARTED_AT).getTime();
+
+    const rows = result.rows.map((r) => {
+      const hitRemovalThreshold = r.report_count >= REPORT_REMOVAL_THRESHOLD;
+      let removalEmailSent;
+      if (!hitRemovalThreshold) {
+        removalEmailSent = "n/a — below threshold";
+      } else if (r.report_removal_email_sent_at) {
+        removalEmailSent = r.report_removal_email_sent_at;
+      } else {
+        const crossedAt = crossedAtByFlatId.get(r.id);
+        removalEmailSent =
+          crossedAt && new Date(crossedAt).getTime() < trackingStartedAt
+            ? "unknown (removed before this was tracked)"
+            : "not sent";
+      }
+      return { ...r, hitRemovalThreshold, removalEmailSent };
+    });
+
     res.json(rows);
   } catch (err) {
     console.error(err);
