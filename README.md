@@ -1,62 +1,155 @@
 # chitwan.rent
 
-A dummy-data clone of bengaluru.rent, reskinned for **Chitwan, Nepal**. PERN stack (PostgreSQL + Express + React/Vite + Node), free map stack (Leaflet + OpenStreetMap/CARTO tiles), currency displayed as **Rs. (NPR)**. Built in 10 phases — see `chitwan-rent-phased-build-prompt.md` for the original spec.
+A map-first, brokerage-free rental listing platform for Chitwan district, Nepal.
 
-## Stack
+## Overview
 
-- `/client` — Vite + React + Tailwind CSS + react-leaflet (+ react-leaflet-cluster) + React Query + React Router
-- `/server` — Express + node-postgres (`pg`) + JWT (`jsonwebtoken`)
-- PostgreSQL (tested against PostgreSQL 17 locally on Windows)
+Renters browse available flats as pins on an interactive map instead of scrolling
+a list; owners list a flat by dropping a pin themselves, with zero brokerage and
+zero listing fees. Alongside listings, anyone can anonymously drop a pin showing
+what rent they actually pay — an honest, crowdsourced counterweight to inflated
+asking prices — and a gamified "Spot a To-Let" layer lets people photograph and
+pin to-let boards they spot around town, with a public leaderboard for the most
+active spotters.
 
-## Prerequisites
+## Features
 
-- Node.js 18+ (tested on v24)
-- PostgreSQL running locally (or a connection string to a hosted instance)
+- **Map-first browsing** — flats render as clustered pins on a live map of
+  Chitwan district, filterable by BHK, rent range, neighbourhood, furnishing,
+  gated status, how recently posted, and proximity to a bus route.
+- **List a flat, free** — owners drop a pin and fill in listing details directly;
+  no broker, no listing fee. Listings go live only after clicking a link in a
+  verification email, and are rate-limited to one new listing per email every
+  24 hours.
+- **Find a flat** — seekers drop a pin describing what they're looking for
+  (budget, BHK, move-in timeline, and more); a weekly digest email connects
+  compatible seekers and owners automatically, within a 2km radius.
+- **Rent-cap fairness check** — listed rent is checked against a typical range
+  for its BHK. A rent that's unusually high still gets warned and flagged
+  (excluded from matching, but still visible on the map); a rent more than
+  double the typical range isn't accepted at all.
+- **Self-service listing management** — an emailed 10-digit code lets an owner
+  mark their own listing as rented or delete it outright, starting 24 hours
+  after verification — no login required.
+- **"I'm interested"** — a lightweight way to express interest in a listing
+  (with optional move-in timeline, gender, and parking needs); the flat's owner
+  is emailed the interested party's contact directly.
+- **Community ratings, comments, and reporting** — real listings can be rated
+  and commented on; a listing that collects enough reports is automatically
+  pulled from the map and the owner is notified why.
+- **Spot a To-Let, gamified** — photograph a to-let board you pass, pin its
+  location, and climb a public leaderboard (under a nickname, not your real
+  name) as you spot more.
+- **Anonymous rent-transparency pins** — drop a pin showing what you actually
+  pay (rent, BHK, gated/not, and optionally furnishing and parking), with no
+  name or contact info attached. **Note:** this data is currently write-only —
+  it's collected and stored, but nothing in the app displays it back yet. That's
+  a known, honest gap, not a hidden one.
 
-## Setup
+## Tech Stack
 
-1. Install dependencies (root workspaces install both `client` and `server`):
+- **Client:** React 18, Vite, Tailwind CSS, react-leaflet
+- **Server:** Express, `pg` (raw SQL, no ORM), JWT
+- **Database:** PostgreSQL
+
+Two npm workspaces (`client`, `server`), orchestrated from the root.
+
+See [STRUCTURE.md](./STRUCTURE.md) for the full architecture — every route,
+component, database column, and business rule, verified against the actual
+code.
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (this project uses ES modules and modern Node APIs — 18+ recommended)
+- PostgreSQL, running locally or reachable via a connection string
+
+### Setup
+
+1. **Clone the repo and install dependencies** (the root workspace installs
+   both `client` and `server`):
 
    ```sh
+   git clone <this-repo-url>
+   cd chitwan-rent
    npm install
    ```
 
-2. Configure environment variables:
-
-   - `server/.env` (copy from `server/.env.example`):
-     ```
-     PORT=4000
-     DATABASE_URL=postgresql://<user>:<password>@localhost:5432/chitwan_rent
-     JWT_SECRET=dev_secret_change_me
-     CLIENT_ORIGIN=http://localhost:5173
-     ```
-   - `client/.env` (copy from `client/.env.example`):
-     ```
-     VITE_API_URL=http://localhost:4000/api
-     ```
-
-3. Create the database (adjust user/host as needed):
+2. **Create the database:**
 
    ```sh
    createdb -U postgres chitwan_rent
    ```
 
-4. Apply the schema and seed the database:
+3. **Configure environment variables** — copy `server/.env.example` to
+   `server/.env` and fill it in:
+
+   | Variable | Required? | What it's for |
+   |---|---|---|
+   | `PORT` | Optional (defaults to `4000`) | API server port |
+   | `DATABASE_URL` | **Required** | PostgreSQL connection string |
+   | `JWT_SECRET` | **Required** for real use (has an insecure dev default) | Signs the dummy-auth JWT |
+   | `CLIENT_ORIGIN` | Optional | Locks CORS to one exact origin; any `http://localhost:<port>` is trusted if unset |
+   | `SERVER_BASE_URL` | Optional (defaults to `http://localhost:$PORT`) | Base URL used to build links inside emails |
+   | `EMAIL_USER` / `EMAIL_PASS` | Required for email to send | Gmail address + [App Password](https://myaccount.google.com/apppasswords) used to send verification/digest/notification emails |
+   | `DIGEST_REPLY_TO` | Optional | Reply-To address on weekly digest emails |
+   | `DASHBOARD_PASSWORD` | Required only for the internal operator dashboard | Shared password gating that one internal-only tool |
+
+   The client also has `client/.env.example` (`VITE_API_URL`), but it already
+   defaults to `http://localhost:4000/api` — you only need a `client/.env` if
+   you're pointing the client somewhere else.
+
+4. **Apply the base schema, then every migration, in order** — `schema.sql`
+   alone is stale and does not produce the current database shape; every
+   `add-*` migration below has to run after it, in this order, to reach it:
 
    ```sh
    npm run db:schema
+
+   cd server
+   node db/add-flat-social-tables.js
+   node db/add-rent-reports-table.js
+   node db/add-poi-tier-column.js
+   node db/add-flat-listing-details.js
+   node db/add-places-table.js
+   node db/add-flats-society-name.js
+   node db/add-flats-is-seed.js
+   node db/add-flat-reports-table.js
+   node db/add-flat-verification.js
+   node db/add-listing-attempts-table.js
+   node db/add-flat-ratings-dimensions.js
+   node db/add-flat-delete-code.js
+   node db/add-delete-attempts-table.js
+   node db/add-flats-description.js
+   node db/add-flatmate-matching.js
+   node db/add-digest-unsubscribe.js
+   node db/add-next-digest-at.js
+   node db/add-users-is-seed.js
+   node db/add-hero-nickname.js
+   node db/add-seeker-pins-archived-at.js
+   node db/add-flats-rent-flagged.js
+   node db/add-rent-reports-furnishing-parking.js
+   node db/add-dashboard-tables.js
+   node db/add-flats-report-removal-email-sent-at.js
+   node db/add-flat-interests-preferences.js
+   node db/add-flat-interests-parking-count.js
+   cd ..
+   ```
+
+   (Most of these also have an `npm run add:<name> -w server` shortcut — see
+   `server/package.json` — but a handful don't, so running each file directly
+   with `node` works uniformly for all of them.)
+
+5. **Seed dummy data** (users, flats, seeker pins, to-let spots, bus routes,
+   POIs, rent reports) — must run *after* the migrations above, since the seed
+   script writes into columns some of them add:
+
+   ```sh
    npm run db:seed
    ```
 
-   This creates the `users`, `flats`, `seeker_pins`, `tolet_spots`, `bus_routes`, and `pois` tables, then seeds:
-   - 10 dummy users (hero_points shaped like a leaderboard: 20 / 3 / 2 / 1 / 1 / 0…)
-   - 180 flats, weighted toward Bharatpur wards 5/10/11/14, tapering off toward Kalika/Rapti/Ichchhakamana, with NPR-realistic rents by BHK
-   - 40 seeker pins
-   - ~27 to-let spots (matches the leaderboard shape above)
-   - 10 bus routes (approximate Chitwan road corridors, as GeoJSON LineStrings)
-   - 25 points of interest (schools, colleges, temples, hospitals, landmarks)
-
-5. Run both client and server in dev mode:
+6. **Run both client and server in dev mode:**
 
    ```sh
    npm run dev
@@ -65,43 +158,14 @@ A dummy-data clone of bengaluru.rent, reskinned for **Chitwan, Nepal**. PERN sta
    - API: http://localhost:4000 (health check at `/api/health`)
    - Client: http://localhost:5173
 
-   Re-running `npm run db:seed` truncates and re-seeds every table (including `users`), so any accounts created via sign-in during testing are wiped along with it — that's expected for a dev/demo dataset.
+   Re-running `npm run db:seed` truncates and re-seeds every table (including
+   `users`), so any accounts created via sign-in during testing are wiped along
+   with it — expected for a dev/demo dataset.
 
-## Auth
+## Built with AI assistance
 
-There's no real account system — signing in (via the "Sign in to continue" gate shown before listing a flat, dropping a seeker pin, or spotting a to-let board) just takes an email and/or phone number, no password or OTP. The server matches or creates a `users` row and returns a JWT, which the client stores in `localStorage` and attaches to write requests. See `server/src/lib/auth.js` and `POST /api/auth/login`.
+Built with significant help from Claude (Anthropic) throughout development.
 
-## API overview
+## License
 
-All routes are mounted under `/api`. Reads (`GET`) are open; writes that create a listing/pin/spot (`POST /api/flats`, `POST /api/seeker-pins`, `POST /api/tolet-spots`) require a `Bearer` token from `/api/auth/login`.
-
-| Route | Notes |
-|---|---|
-| `/flats` | list + filter (bhk, rent range, area, furnishing, gated, posted-within, near-bus-route); `POST` creates (auth required) |
-| `/seeker-pins` | list; `POST` creates (auth required) |
-| `/tolet-spots` | list; `POST` creates (auth required), increments the spotter's `hero_points` |
-| `/superheroes` | ranked leaderboard from `users.hero_points` |
-| `/areas` | distinct ward names + centroids, derived from `flats` |
-| `/bus-routes`, `/pois` | static seeded reference layers |
-| `/stats/nearby` | median rent by BHK within a radius of a point |
-| `/stats/area` | avg/min/max rent by BHK inside a drawn bounding box |
-| `/auth/login` | dummy sign-in, returns a JWT |
-
-## Feature checklist (Phases 0–9)
-
-- [x] Phase 0 — Scaffold & data foundation
-- [x] Phase 1 — App shell & map base
-- [x] Phase 2 — Available flats + cluster badges + detail card
-- [x] Phase 3 — Search + filter
-- [x] Phase 4 — List My Flat
-- [x] Phase 5 — Find a Flat
-- [x] Phase 6 — Spot a To-Let + Superheroes
-- [x] Phase 7 — Bus routes + school/college layer
-- [x] Phase 8 — More panel: locate me / hide pins / area stats
-- [x] Phase 9 — Polish & wrap-up (mobile pass, empty/loading states, JWT auth gating, seed-data sanity check)
-
-## Known limitations
-
-- Uploaded photos (to-let board snaps) are stored as base64 data URLs directly in Postgres — fine for this dummy-data scale, not how you'd do it in production (would want object storage + `multer`).
-- No email delivery — "we'll email you when seekers match" is copy only, no matching job runs.
-- Nominatim (OpenStreetMap) reverse-geocoding calls the public API directly from the browser; it's rate-limited and best-effort, with a same-district nearest-seeded-ward fallback if it fails or times out.
+No license has been set for this project yet.
