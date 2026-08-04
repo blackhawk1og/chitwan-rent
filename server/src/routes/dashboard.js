@@ -69,15 +69,24 @@ router.get("/listings", async (req, res) => {
   const params = [];
   if (status) {
     params.push(status);
-    conditions.push(`status = $${params.length}`);
+    conditions.push(`f.status = $${params.length}`);
   }
   const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
   try {
+    // LEFT JOIN (not INNER) — same reasoning as routes/flats.js's own
+    // SELECT_WITH_OWNER: flats.owner_id is nullable, so a row with no
+    // resolvable owner still shows up here with owner_id/owner_email null
+    // instead of silently vanishing from the table. Owner email is surfaced
+    // specifically so the delete-user search below doesn't need a manual SQL
+    // join to find who to look up — phone is deliberately left out (not
+    // needed for that search, and not meant to be exposed in this table).
     const result = await query(
-      `SELECT id, status, bhk, rent, posted_at, is_seed
-       FROM flats ${whereClause}
-       ORDER BY posted_at DESC
+      `SELECT f.id, f.status, f.bhk, f.rent, f.posted_at, f.is_seed, u.id AS owner_id, u.email AS owner_email
+       FROM flats f
+       LEFT JOIN users u ON u.id = f.owner_id
+       ${whereClause}
+       ORDER BY f.posted_at DESC
        LIMIT 200`,
       params
     );

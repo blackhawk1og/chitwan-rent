@@ -235,6 +235,10 @@ function RecentListingsSection() {
               { key: "rent", label: "Rent", render: (r) => formatRs(r.rent) },
               { key: "posted_at", label: "Posted", render: (r) => `${formatRelativeTime(r.posted_at)} ago` },
               { key: "is_seed", label: "Source", render: (r) => <SeedBadge isSeed={r.is_seed} /> },
+              { key: "owner_id", label: "Owner ID", render: (r) => r.owner_id ?? "—" },
+              // Feeds straight into the delete-user search above/below it —
+              // deliberately email, not phone (out of scope for this table).
+              { key: "owner_email", label: "Owner email", render: (r) => r.owner_email ?? "—" },
             ]}
             rows={listingsQuery.data ?? []}
           />
