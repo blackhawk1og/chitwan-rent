@@ -12,7 +12,11 @@ function StackButton({ icon: Icon, label, active, onClick }) {
       >
         <Icon size={18} />
       </span>
-      <span className="text-[11px] font-medium text-text-muted">{label}</span>
+      {/* Hidden below sm: (640px) — same convention TopNavPill.jsx already
+          uses for its own pill labels. Icon-only at mobile widths keeps this
+          fixed-position stack from eating into the narrower map view and
+          overlapping nearby flat-marker chips. */}
+      <span className="hidden text-[11px] font-medium text-text-muted sm:inline">{label}</span>
     </button>
   );
 }
