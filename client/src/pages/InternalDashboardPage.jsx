@@ -516,7 +516,7 @@ function DeleteUserSection() {
     >
       <form onSubmit={handleLookup} className="flex flex-wrap items-end gap-3">
         <div className="min-w-[220px] flex-1">
-          <TextField label="User id, email, or phone" placeholder="e.g. 42" value={q} onChange={(e) => setQ(e.target.value)} />
+          <TextField label="User id or email" placeholder="e.g. 42" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <button
           type="submit"

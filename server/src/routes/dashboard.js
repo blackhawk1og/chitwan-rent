@@ -248,23 +248,26 @@ router.get("/hygiene", async (req, res) => {
 });
 
 // --- 6. Single explicit user delete --------------------------------------
-// GET /users/lookup?q=<id, email, or phone>
+// GET /users/lookup?q=<id or email>
+// id and email only, by explicit instruction — phone is deliberately not a
+// search key here (unlike the rate-limit lookup section above, which does
+// resolve phone -> email via this same users table). Do not add it.
 router.get("/users/lookup", async (req, res) => {
   const q = String(req.query.q || "").trim();
-  if (!q) return res.status(400).json({ error: "q (id, email, or phone) is required" });
+  if (!q) return res.status(400).json({ error: "q (id or email) is required" });
   const isNumeric = /^\d+$/.test(q);
 
   try {
     // Cast the COLUMN, not the parameter (`id::text = $1`, not `id =
     // $1::int`) — pg infers one type per placeholder for the whole prepared
     // statement, so an explicit ::int cast on $1 here would force $1 to int
-    // everywhere it appears, breaking the plain-text `email = $1` / `phone =
-    // $1` comparisons below it (found this the hard way while smoke-testing:
-    // "operator does not exist: text = integer").
+    // everywhere it appears, breaking the plain-text `email = $1` comparison
+    // below it (found this the hard way while smoke-testing: "operator does
+    // not exist: text = integer").
     const userResult = await query(
       `SELECT id, name, email, phone, role, hero_points, is_seed, created_at
        FROM users
-       WHERE ${isNumeric ? "id::text = $1 OR " : ""}email = $1 OR phone = $1
+       WHERE ${isNumeric ? "id::text = $1 OR " : ""}email = $1
        LIMIT 1`,
       [q]
     );
