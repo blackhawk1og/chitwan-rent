@@ -1,6 +1,9 @@
 import { query } from "../db.js";
 
-const WINDOW_HOURS = 24;
+// Exported so the internal dashboard's rate-limit lookup (routes/
+// dashboard.js) computes the same 24h window this rate limit itself actually
+// enforces, instead of a hand-copied number that could drift from it.
+export const WINDOW_HOURS = 24;
 
 // One flat-listing attempt per email per 24h, regardless of what happens to
 // the resulting listing afterward (verified, still pending, or later

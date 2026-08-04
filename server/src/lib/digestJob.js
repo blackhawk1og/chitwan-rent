@@ -100,13 +100,17 @@ async function logMatchSeen(flatId, seekerPinId) {
 // matching only — they stay visible on the map and under ?status=available
 // (see AddFlatForm.jsx's RentCapConfirmModal), same exclusion shape as
 // is_seed but a different reason.
-const ACTIVE_FLATS_SQL = `
+// Exported (not just module-local) so the internal dashboard's "Digest job
+// health" section (routes/dashboard.js) can compute due-vs-not-due counts
+// against this exact same eligibility filter instead of a hand-copied one
+// that could silently drift from it.
+export const ACTIVE_FLATS_SQL = `
   SELECT f.*, u.name AS owner_name, u.phone AS owner_phone, u.email AS owner_email
   FROM flats f
   LEFT JOIN users u ON u.id = f.owner_id
   WHERE f.status = 'available' AND f.is_seed = false AND f.rent_flagged = false
 `;
-const ACTIVE_SEEKERS_SQL = `
+export const ACTIVE_SEEKERS_SQL = `
   SELECT sp.*, u.name AS seeker_name
   FROM seeker_pins sp
   LEFT JOIN users u ON u.id = sp.user_id
@@ -280,7 +284,21 @@ export async function runDigestJob() {
     }
   }
 
-  return { flatDigestsSent, flatDigestsSkipped, seekerDigestsSent, seekerDigestsSkipped };
+  const summary = { flatDigestsSent, flatDigestsSkipped, seekerDigestsSent, seekerDigestsSkipped, dueFlats: dueFlats.length, dueSeekers: dueSeekers.length };
+
+  // Logged so the internal dashboard's "Digest job health" section (added by
+  // the same feature that introduced this table — see
+  // db/add-dashboard-tables.js) has something real to show for "last run" and
+  // "last run summary" instead of only ever seeing console output. One row
+  // per run, same append-only-log shape as this file's own logMatchSeen —
+  // never allowed to fail the job itself over a logging error.
+  try {
+    await query("INSERT INTO digest_runs (summary) VALUES ($1)", [JSON.stringify(summary)]);
+  } catch (err) {
+    console.error("Failed to log digest run:", err.message);
+  }
+
+  return summary;
 }
 
 // Hourly due-check, following cleanupExpiredListings.js's exact pattern —

@@ -15,7 +15,10 @@ const DELETE_ELIGIBILITY_DELAY_MS = 24 * 60 * 60 * 1000;
 // "remove this flat" action anywhere. This constant only drives when the
 // report route below fires the owner notification once, at the exact moment
 // a flat's report_count crosses into that filtered-out range.
-const REPORT_REMOVAL_THRESHOLD = 3;
+// Exported so the internal dashboard's "Reports" section (routes/
+// dashboard.js) can flag which reported flats have hit this same threshold
+// without hand-copying the number.
+export const REPORT_REMOVAL_THRESHOLD = 3;
 
 // Base URL for the link a verification email points at — see
 // routes/verifyListing.js, mounted at this same origin's /verify-listing.

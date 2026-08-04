@@ -5,6 +5,7 @@ import AboutPage from "./pages/AboutPage.jsx";
 import ContactPage from "./pages/ContactPage.jsx";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage.jsx";
 import TermsOfUsePage from "./pages/TermsOfUsePage.jsx";
+import InternalDashboardPage from "./pages/InternalDashboardPage.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx";
 
 export default function App() {
@@ -17,6 +18,11 @@ export default function App() {
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/termofuse" element={<TermsOfUsePage />} />
+        {/* Internal-only, password-gated (see InternalDashboardPage.jsx /
+            server's routes/dashboard.js) — not linked from any nav or public
+            page, same "route not in the catch-all" treatment as the other
+            standalone pages above. */}
+        <Route path="/internal/dashboard" element={<InternalDashboardPage />} />
         {/* MapShell owns every other path itself via useLocation() (e.g.
             /list-my-flat, /find-a-flat, /how-to-use, /superheroes) — this
             catch-all preserves that, matching how it rendered unconditionally

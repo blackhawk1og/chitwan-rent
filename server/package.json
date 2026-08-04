@@ -29,7 +29,8 @@
     "digest:run-now": "node db/run-digest-now.js",
     "add:users-is-seed": "node db/add-users-is-seed.js",
     "add:hero-nickname": "node db/add-hero-nickname.js",
-    "add:seeker-pins-archived-at": "node db/add-seeker-pins-archived-at.js"
+    "add:seeker-pins-archived-at": "node db/add-seeker-pins-archived-at.js",
+    "add:dashboard-tables": "node db/add-dashboard-tables.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

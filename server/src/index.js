@@ -14,6 +14,7 @@ import authRouter from "./routes/auth.js";
 import rentReportsRouter from "./routes/rentReports.js";
 import verifyListingRouter from "./routes/verifyListing.js";
 import unsubscribeRouter from "./routes/unsubscribe.js";
+import dashboardRouter from "./routes/dashboard.js";
 import { startExpiredListingsCleanup } from "./lib/cleanupExpiredListings.js";
 import { startDigestJob } from "./lib/digestJob.js";
 
@@ -31,7 +32,15 @@ const corsOrigin = process.env.CLIENT_ORIGIN
   ? process.env.CLIENT_ORIGIN
   : (origin, callback) => callback(null, !origin || /^http:\/\/localhost:\d+$/.test(origin));
 
-app.use(cors({ origin: corsOrigin }));
+// credentials: true is required for the internal dashboard's signed session
+// cookie (src/lib/dashboardAuth.js) to be sent/received on cross-origin
+// requests from the client dev server (5173) to this API (4000) — every
+// other route in this app uses a Bearer token instead, which doesn't need
+// this. Safe to enable broadly: corsOrigin above is never the literal "*"
+// (it's either one exact CLIENT_ORIGIN or a callback that reflects one
+// specific localhost origin per request), which is required for
+// credentialed CORS to work at all.
+app.use(cors({ origin: corsOrigin, credentials: true }));
 // Raised from Express's 100kb default — to-let board photos travel as base64 JSON.
 app.use(express.json({ limit: "10mb" }));
 
@@ -50,6 +59,11 @@ app.use("/api/pois", poisRouter);
 app.use("/api/places", placesRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/rent-reports", rentReportsRouter);
+// Deliberately still under /api/internal/dashboard, not just /api/dashboard —
+// the route is unguessable-by-convention on top of being password-gated (see
+// routes/dashboard.js); nothing links to it from any public page, nav, or
+// sitemap.
+app.use("/api/internal/dashboard", dashboardRouter);
 
 // Not under /api — this is the literal link a browser navigates to from the
 // verification email (see lib/email.js), not a JSON endpoint the SPA calls.
