@@ -1,16 +1,41 @@
 import "dotenv/config";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-// Gmail + an App Password is the standard "just user/pass" Nodemailer setup
-// — matches the two env vars this feature calls for (EMAIL_USER, EMAIL_PASS)
-// with nothing extra (host/port/etc.) to configure.
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+// Resend (resend.com) — an HTTPS email API, not SMTP. Gmail SMTP via
+// Nodemailer (the previous transport here) doesn't work on Render's free
+// tier: outbound SMTP connections there time out (confirmed live,
+// "Connection timeout" in production logs). HTTPS traffic isn't subject to
+// that restriction. RESEND_API_KEY replaces EMAIL_USER/EMAIL_PASS — neither
+// is read anywhere in this file anymore.
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+// No sending domain is verified in Resend for this project yet, so every
+// email sends from Resend's own shared address rather than a
+// chitwan.rent one — see the RESEND_API_KEY note in .env.example for the
+// real limitation that comes with that (only deliverable to the Resend
+// account's own signup address until a domain is verified).
+const FROM_ADDRESS = "Chitwan Rent <onboarding@resend.dev>";
+
+// Resend's SDK resolves { data, error } rather than throwing on a failed
+// send. Every send*Email function below still needs to throw on failure —
+// that's the contract every call site already relies on (see
+// routes/flats.js, routes/seekerPins.js, routes/verifyListing.js,
+// lib/digestJob.js: each wraps its call in try/catch and treats a caught
+// error as "log it, don't fail the request/job over it"). This one helper
+// keeps that error-to-throw translation in one place instead of repeating
+// it in all eight functions below.
+async function sendMail({ to, subject, html, replyTo }) {
+  const { error } = await resend.emails.send({
+    from: FROM_ADDRESS,
+    to,
+    subject,
+    html,
+    ...(replyTo ? { replyTo } : {}),
+  });
+  if (error) {
+    throw new Error(error.message || "Resend send failed");
+  }
+}
 
 const BRAND_PURPLE = "#7c3aed";
 
@@ -76,8 +101,7 @@ function verificationEmailHtml(verifyUrl) {
 // the request in flight (see POST /api/flats in routes/flats.js, which logs
 // and still responds success rather than failing the listing over this).
 export async function sendVerificationEmail({ to, verifyUrl }) {
-  await transporter.sendMail({
-    from: process.env.EMAIL_USER,
+  await sendMail({
     to,
     subject: "Verify your Chitwan Rent listing",
     html: verificationEmailHtml(verifyUrl),
@@ -139,8 +163,7 @@ function seekerConfirmationEmailHtml() {
 // as every other send*Email function here; the caller logs and continues
 // rather than failing pin creation over a bad send.
 export async function sendSeekerConfirmationEmail({ to }) {
-  await transporter.sendMail({
-    from: process.env.EMAIL_USER,
+  await sendMail({
     to,
     subject: "Your search is live on Chitwan Rent",
     html: seekerConfirmationEmailHtml(),
@@ -215,8 +238,7 @@ function deleteCodeEmailHtml({ flatId, code }) {
 // break the verification response, since the listing is already live either
 // way by the time this runs.
 export async function sendDeleteCodeEmail({ to, flatId, code }) {
-  await transporter.sendMail({
-    from: process.env.EMAIL_USER,
+  await sendMail({
     to,
     subject: "Your Chitwan Rent listing's delete code",
     html: deleteCodeEmailHtml({ flatId, code }),
@@ -300,8 +322,7 @@ function reportRemovalEmailHtml({ flatId, reportCount, reasons }) {
 // throw-on-failure, log-and-continue contract as every other send*Email
 // function here.
 export async function sendReportRemovalEmail({ to, flatId, reportCount, reasons }) {
-  await transporter.sendMail({
-    from: process.env.EMAIL_USER,
+  await sendMail({
     to,
     subject: "Your Chitwan Rent listing was removed",
     html: reportRemovalEmailHtml({ flatId, reportCount, reasons }),
@@ -393,8 +414,7 @@ function interestNotificationEmailHtml({ flatId, contact, note, moveIn, gender, 
 // function here — a failed send never turns a successful interest
 // submission into an error response.
 export async function sendInterestNotificationEmail({ to, flatId, contact, note, moveIn, gender, parkingRequired, parkingCount }) {
-  await transporter.sendMail({
-    from: process.env.EMAIL_USER,
+  await sendMail({
     to,
     subject: "Someone's interested in your Chitwan Rent listing",
     html: interestNotificationEmailHtml({ flatId, contact, note, moveIn, gender, parkingRequired, parkingCount }),
@@ -554,10 +574,9 @@ export async function sendFlatMatchDigest({ to, ownerName, flat, matches, unsubs
     )
     .join("");
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_USER,
+  await sendMail({
     to,
-    ...(process.env.DIGEST_REPLY_TO ? { replyTo: process.env.DIGEST_REPLY_TO } : {}),
+    replyTo: process.env.DIGEST_REPLY_TO,
     subject: "This week's compatible seekers near your listing",
     html: digestShellHtml({
       heading,
@@ -592,10 +611,9 @@ export async function sendSeekerMatchDigest({ to, seekerName, seeker, matches, u
     )
     .join("");
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_USER,
+  await sendMail({
     to,
-    ...(process.env.DIGEST_REPLY_TO ? { replyTo: process.env.DIGEST_REPLY_TO } : {}),
+    replyTo: process.env.DIGEST_REPLY_TO,
     subject: "This week's compatible flats near you",
     html: digestShellHtml({
       heading,
@@ -750,10 +768,9 @@ export async function sendCombinedDigest({ to, sections }) {
   const firstNamed = sections.find((section) => section.ownerName || section.seekerName);
   const greeting = firstNamed ? `Hi ${firstNamed.ownerName || firstNamed.seekerName}, we` : "We";
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_USER,
+  await sendMail({
     to,
-    ...(process.env.DIGEST_REPLY_TO ? { replyTo: process.env.DIGEST_REPLY_TO } : {}),
+    replyTo: process.env.DIGEST_REPLY_TO,
     subject: "This week's Chitwan Rent digest",
     html: digestShellMultiHtml({
       heading: `Your Chitwan Rent digest — ${sections.length} active items`,
