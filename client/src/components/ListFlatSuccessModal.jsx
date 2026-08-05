@@ -5,8 +5,16 @@ import { useNearbySeekers } from "../hooks/useNearbySeekers.js";
 import { useAddFlatPhotos } from "../hooks/useAddFlatPhotos.js";
 import { useRemoveFlatPhoto } from "../hooks/useRemoveFlatPhoto.js";
 
-const DEFAULT_SHARE_MESSAGE =
-  "Just pinned my rental details anonymously on chitwan.rent 📍 It's Chitwan's first anonymous rent map — no brokers, no listings, just what people actually pay. Takes 20 seconds & no signup.";
+// window.location.origin instead of a hardcoded domain (was the bare text
+// "chitwan.rent", which isn't actually where this app is deployed — the
+// real production URL is https://chitwan-rent.vercel.app, a custom domain
+// was never set up) — this way the shared link always points at whatever
+// origin the visitor is actually using (production, a Vercel preview
+// deployment, or localhost in dev) with no manual fix needed if the domain
+// ever changes.
+function buildDefaultShareMessage() {
+  return `Just pinned my rental details anonymously on ${window.location.origin} 📍 It's Chitwan's first anonymous rent map — no brokers, no listings, just what people actually pay. Takes 20 seconds & no signup.`;
+}
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -24,7 +32,7 @@ export default function ListFlatSuccessModal({ flat, onClose }) {
   const fileInputRef = useRef(null);
 
   const [photos, setPhotos] = useState(flat.photos ?? []);
-  const [shareText, setShareText] = useState(DEFAULT_SHARE_MESSAGE);
+  const [shareText, setShareText] = useState(buildDefaultShareMessage);
   const [copied, setCopied] = useState(false);
 
   const remainingSlots = 6 - photos.length;

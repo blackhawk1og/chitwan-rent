@@ -16,7 +16,8 @@ function NavBar() {
   return (
     <nav className="border-b border-white/10">
       <div className="flex w-full flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-4 sm:px-10">
-        <Link to="/" className="text-base font-extrabold text-accent-purple-light transition hover:opacity-80">
+        <Link to="/" className="flex items-center gap-2 text-base font-extrabold text-accent-purple-light transition hover:opacity-80">
+          <img src="/ctwnlogo.webp" alt="" className="h-7 w-7 rounded-lg object-cover" />
           Chitwan Rent
         </Link>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">

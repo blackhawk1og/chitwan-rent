@@ -33,17 +33,31 @@ function readCookie(req, name) {
   return null;
 }
 
+// Frontend (Vercel) and backend (Render) are different origins in
+// production, so this cookie is cross-site there — SameSite=Lax cookies are
+// NOT sent on cross-site requests by default, which is why login previously
+// appeared to "not persist" in production (the cookie was set, just never
+// sent back on the next request). SameSite=None is required to allow that,
+// and browsers refuse SameSite=None without Secure, so both only apply
+// together, only in production: local dev is same-origin-ish
+// (localhost:5173 -> localhost:4000) where Lax already works fine, and
+// Secure would silently break the cookie over local http://.
+const isProduction = process.env.NODE_ENV === "production";
+
 function writeCookie(res, name, value, maxAgeMs) {
-  const attrs = [`${name}=${encodeURIComponent(value)}`, "Path=/", "HttpOnly", "SameSite=Lax"];
+  const attrs = [`${name}=${encodeURIComponent(value)}`, "Path=/", "HttpOnly"];
+  attrs.push(isProduction ? "SameSite=None" : "SameSite=Lax");
+  if (isProduction) attrs.push("Secure");
   attrs.push(`Max-Age=${Math.floor(maxAgeMs / 1000)}`);
-  // Secure requires HTTPS — set only in production so local http://
-  // dev doesn't silently drop the cookie.
-  if (process.env.NODE_ENV === "production") attrs.push("Secure");
   res.setHeader("Set-Cookie", attrs.join("; "));
 }
 
 function clearCookie(res, name) {
-  res.setHeader("Set-Cookie", `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+  const attrs = [`${name}=`, "Path=/", "HttpOnly"];
+  attrs.push(isProduction ? "SameSite=None" : "SameSite=Lax");
+  if (isProduction) attrs.push("Secure");
+  attrs.push("Max-Age=0");
+  res.setHeader("Set-Cookie", attrs.join("; "));
 }
 
 // --- Session issue/verify -----------------------------------------------
