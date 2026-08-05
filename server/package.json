@@ -37,11 +37,11 @@
     "add:flat-interests-parking-count": "node db/add-flat-interests-parking-count.js"
   },
   "dependencies": {
+    "@sendgrid/mail": "^8.1.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "jsonwebtoken": "^9.0.2",
-    "pg": "^8.13.1",
-    "resend": "^6.18.1"
+    "pg": "^8.13.1"
   }
 }

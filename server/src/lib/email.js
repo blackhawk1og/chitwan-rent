@@ -1,40 +1,43 @@
 import "dotenv/config";
-import { Resend } from "resend";
+import sgMail from "@sendgrid/mail";
 
-// Resend (resend.com) — an HTTPS email API, not SMTP. Gmail SMTP via
-// Nodemailer (the previous transport here) doesn't work on Render's free
-// tier: outbound SMTP connections there time out (confirmed live,
-// "Connection timeout" in production logs). HTTPS traffic isn't subject to
-// that restriction. RESEND_API_KEY replaces EMAIL_USER/EMAIL_PASS — neither
-// is read anywhere in this file anymore.
-const resend = new Resend(process.env.RESEND_API_KEY);
+// SendGrid (sendgrid.com) — an HTTPS email API, not SMTP, same as the
+// Resend transport this replaces. Still sidesteps Render's free-tier SMTP
+// block (outbound SMTP times out there; HTTPS traffic is unaffected).
+//
+// Swapped in for Resend because Resend's only no-domain sending option
+// (the shared onboarding@resend.dev address) only ever delivers to the
+// Resend account's own signup email — not usable for real users without a
+// verified domain, which this project isn't getting. SendGrid's Single
+// Sender Verification instead lets one verified real address send to any
+// recipient, free, with no domain required — see FROM_ADDRESS below.
+// SENDGRID_API_KEY replaces RESEND_API_KEY; the Resend dependency has been
+// removed (see package.json / .env.example).
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-// No sending domain is verified in Resend for this project yet, so every
-// email sends from Resend's own shared address rather than a
-// chitwan.rent one — see the RESEND_API_KEY note in .env.example for the
-// real limitation that comes with that (only deliverable to the Resend
-// account's own signup address until a domain is verified).
-const FROM_ADDRESS = "Chitwan Rent <onboarding@resend.dev>";
+// chitwanrent@gmail.com — verified as a Single Sender in the SendGrid
+// dashboard by the project owner. That verification is what lets this
+// address send to any recipient rather than just its own inbox, which is
+// exactly the limitation this swap is fixing.
+const FROM_ADDRESS = { email: "chitwanrent@gmail.com", name: "Chitwan Rent" };
 
-// Resend's SDK resolves { data, error } rather than throwing on a failed
-// send. Every send*Email function below still needs to throw on failure —
-// that's the contract every call site already relies on (see
-// routes/flats.js, routes/seekerPins.js, routes/verifyListing.js,
-// lib/digestJob.js: each wraps its call in try/catch and treats a caught
-// error as "log it, don't fail the request/job over it"). This one helper
-// keeps that error-to-throw translation in one place instead of repeating
-// it in all eight functions below.
+// @sendgrid/mail's send() already rejects (throws) on a failed send, unlike
+// Resend's { data, error } return — so this helper is now just a single
+// choke point for the from address + optional replyTo, nothing more. Every
+// send*Email function below already calls this instead of touching the
+// client directly, so throw-on-failure (the contract every call site
+// already relies on — see routes/flats.js, routes/seekerPins.js,
+// routes/verifyListing.js, lib/digestJob.js: each wraps its call in
+// try/catch and treats a caught error as "log it, don't fail the
+// request/job over it") keeps working unchanged.
 async function sendMail({ to, subject, html, replyTo }) {
-  const { error } = await resend.emails.send({
+  await sgMail.send({
     from: FROM_ADDRESS,
     to,
     subject,
     html,
     ...(replyTo ? { replyTo } : {}),
   });
-  if (error) {
-    throw new Error(error.message || "Resend send failed");
-  }
 }
 
 const BRAND_PURPLE = "#7c3aed";
