@@ -8,6 +8,7 @@
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
     "db:schema": "node db/run-schema.js",
+    "db:migrate": "node db/migrate-all.js",
     "db:seed": "node db/seed.js",
     "seed:bus-routes": "node db/seed-bus-routes.js",
     "seed:pois": "node db/seed-pois.js",
