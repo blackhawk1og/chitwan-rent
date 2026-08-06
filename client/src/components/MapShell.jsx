@@ -39,6 +39,7 @@ import IconStack from "./IconStack.jsx";
 import OnboardingModal, { isOnboardingDismissed } from "./OnboardingModal.jsx";
 import HowToUseTour, { isHowToUseTourSeen } from "./HowToUseTour.jsx";
 import LandingCard from "./LandingCard.jsx";
+import InitialLoadScreen from "./InitialLoadScreen.jsx";
 import FilterModal from "./FilterModal.jsx";
 import FlatsLayer from "./FlatsLayer.jsx";
 import ToletSpotsLayer from "./ToletSpotsLayer.jsx";
@@ -171,6 +172,24 @@ export default function MapShell() {
   const filterCount = countActiveFilters(filters);
 
   const { data: flats = [], isLoading: flatsLoading } = useFlats(filters);
+
+  // InitialLoadScreen only ever covers the very first flats fetch of the
+  // session — the one that can be sitting behind a cold Render free-tier
+  // instance (30-60s) — never the quick refetches that follow every filter
+  // change (those keep the small "Loading flats…" pill below, unchanged).
+  // initialLoadDoneRef flips exactly once, the first time flatsLoading goes
+  // false; showInitialLoad stays true a beat longer than that so
+  // InitialLoadScreen gets to play its own fade-out (fadingOut prop) instead
+  // of popping out the instant data arrives.
+  const [showInitialLoad, setShowInitialLoad] = useState(true);
+  const initialLoadDoneRef = useRef(false);
+  useEffect(() => {
+    if (!flatsLoading && !initialLoadDoneRef.current) {
+      initialLoadDoneRef.current = true;
+      const timer = setTimeout(() => setShowInitialLoad(false), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [flatsLoading]);
   const { data: areas = [] } = useAreas();
   const { data: places = [] } = usePlaces();
   const { data: toletSpots = [] } = useToletSpots(filters.showToletBoards);
@@ -1203,12 +1222,14 @@ export default function MapShell() {
         />
       )}
 
-      {flatsLoading && (
+      {showInitialLoad && <InitialLoadScreen fadingOut={!flatsLoading} />}
+
+      {flatsLoading && !showInitialLoad && (
         <div className="pointer-events-none absolute bottom-8 left-1/2 z-[900] -translate-x-1/2 rounded-full border border-white/10 bg-surface/90 px-4 py-2 text-xs font-semibold text-text-muted shadow-lg backdrop-blur-md">
           Loading flats…
         </div>
       )}
-      {!flatsLoading && displayedFlats.length === 0 && (
+      {!flatsLoading && !showInitialLoad && displayedFlats.length === 0 && (
         <div className="pointer-events-none absolute bottom-8 left-1/2 z-[900] -translate-x-1/2 rounded-full border border-white/10 bg-surface/90 px-4 py-2 text-xs font-semibold text-text-muted shadow-lg backdrop-blur-md">
           No flats match your filters
         </div>

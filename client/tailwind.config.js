@@ -37,6 +37,13 @@ export default {
             filter: "drop-shadow(0 0 2px rgba(255,255,255,0.95)) drop-shadow(0 0 4px rgba(66,133,244,0.95))",
           },
         },
+        // Used by InitialLoadScreen's rotating tips — a fresh key={index}
+        // remounts the <p> on every tip change, replaying this fade-in for
+        // a lightweight crossfade feel out of a single keyframe.
+        "fade-in": {
+          "0%": { opacity: "0", transform: "translateY(2px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
         // Slow ambient glow for StatusBanner (Avlb Flats / List My Flat /
         // Find a Flat's status cards) — one keyframe per accent color since
         // those are the only three StatusBanner ever uses, matching the
@@ -58,6 +65,7 @@ export default {
         "attention-pulse": "attention-pulse 0.6s ease-in-out 3",
         "locate-pulse": "locate-pulse 1.8s ease-out infinite",
         "pin-glow-blink": "pin-glow-blink 0.5s ease-in-out 1",
+        "fade-in": "fade-in 0.4s ease-out",
         "card-glow-teal": "card-glow-teal 2.2s ease-in-out infinite",
         "card-glow-purple": "card-glow-purple 2.2s ease-in-out infinite",
         "card-glow-orange": "card-glow-orange 2.2s ease-in-out infinite",

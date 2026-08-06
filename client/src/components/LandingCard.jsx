@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import LegalModal from "./LegalModal.jsx";
 
 const SHARE_MESSAGE =
-  "Check out chitwan.rent — every rental in Chitwan on one map. ₹0 brokerage, no signup needed to browse. 🏠📍";
+  "Check out https://chitwan-rent.vercel.app — every rental in Chitwan on one map. ₹0 brokerage, no signup needed to browse. 🏠📍";
 
 // Strips a trailing "-<digits>" ward suffix (e.g. "Bharatpur-10" -> "Bharatpur")
 // so the coverage line reads like a place name instead of an internal ward
