@@ -41,6 +41,7 @@ client/
 │   ├── lib/                 Framework-free utilities (formatting, map config, geo math...)
 │   └── context/             AuthContext (dummy email/phone sign-in)
 ├── vite.config.js
+├── vercel.json              SPA rewrite — see the Deployment section below
 └── package.json
 ```
 
@@ -118,6 +119,7 @@ visits).
 | `StatusBanner.jsx` | Collapsed top-bar banner shared by the Avlb-Flats/List-My-Flat/Find-a-Flat "in progress" states. |
 | `PinDropBanner.jsx` | Full-width top banner shown while Spot-a-To-Let or Area-Stats is waiting for a map tap. |
 | `ListingChip.jsx` | Small bottom-left preview chip shown after tapping a flat/seeker marker, before opening the full detail panel. |
+| `InitialLoadScreen.jsx` | Non-blocking overlay card shown only for the *very first* `useFlats` fetch of the session — the one that can be sitting behind a cold Render free-tier instance (30-60s). Rotating tips (reused verbatim from `LandingCard.jsx`'s own tone), a bouncing icon, and honest "waking up the server" copy, styled with the same card look and the existing `card-glow-purple` animation as the rest of the app. Every *later* reload (e.g. a filter change) keeps the original small "Loading flats…" pill unchanged — `MapShell` tracks whether the first-ever load has completed and never shows this card again after that. |
 
 ### Map layers (children of `<MapContainer>`)
 
@@ -150,7 +152,7 @@ visits).
 
 | File | Purpose |
 |---|---|
-| `AddFlatForm.jsx` → `ListFlatBranchModal.jsx` → `ListFlatDetailsForm.jsx` → `ListFlatSuccessModal.jsx` | The "List My Flat" flow: core listing fields (incl. the rent-cap check — see "Rent-cap system" below) → whole-flat-vs-flatmate branch → availability/parking/contact details → success + share. `ListFlatDetailsForm` collects email/phone and is where the account is actually created (see auth-gating note below); for `flatmate`-type listings it also shows consent copy that email/phone get shared with compatible seekers by the digest job. `ListFlatSuccessModal` leads with "Verify your listing and your pin will be visible to everyone" + a spam-folder hint, reflecting the email-verification gate (see "Email verification & flat deletion / status" below) — the listing is **not** live yet when this modal shows. |
+| `AddFlatForm.jsx` → `ListFlatBranchModal.jsx` → `ListFlatDetailsForm.jsx` → `ListFlatSuccessModal.jsx` | The "List My Flat" flow: core listing fields (incl. the rent-cap check — see "Rent-cap system" below) → whole-flat-vs-flatmate branch → availability/parking/contact details → success + share. `ListFlatDetailsForm` collects email/phone and is where the account is actually created (see auth-gating note below); for `flatmate`-type listings it also shows consent copy that email/phone get shared with compatible seekers by the digest job. `ListFlatSuccessModal` leads with "Verify your listing and your pin will be visible to everyone" + a spam-folder hint, reflecting the email-verification gate (see "Email verification & flat deletion / status" below) — the listing is **not** live yet when this modal shows. Its WhatsApp share text builds the link from `window.location.origin` at share-time, not a hardcoded domain — resolves to the real production URL (`https://chitwan-rent.vercel.app`) automatically, whatever a Vercel preview URL, or `localhost` in dev, with no manual fix ever needed if the domain changes. |
 | `RentCapConfirmModal.jsx` | "Double-check this pin?" — shown by `AddFlatForm` only when the soft rent-cap warning is active; see "Rent-cap system" below. |
 | `DropSeekerPinForm.jsx` | "Find a Flat" — the seeker's preferences + contact form; same digest-consent copy as `ListFlatDetailsForm` when `lookingFor === "room"`. Submitting when the entered email already has other `seeker_pins` rows triggers `ArchiveCheckPinsModal.jsx` first — see "Seeker-pin archive flow" below. |
 | `ArchiveCheckPinsModal.jsx` | Shown before creating a new seeker pin when the submitted email already has existing pins (active and/or archived) on file — lets the submitter archive some/all/none of their old ones. See "Seeker-pin archive flow" below. |
@@ -192,7 +194,7 @@ before the `POST /:id/interest` request fires.
 | `AreaStatsResultsModal.jsx` | Avg/min/max rent by BHK bucket for the drawn rectangle, via `useAreaStats`. |
 | `HowToUseTour.jsx` | Guided first-visit tour — auto-launches the first time anyone lands on `/` (`isHowToUseTourSeen()`/`localStorage`'s `how-to-use-tour-seen`), also reachable any time via the nav pill row's "How to use" link (`/how-to-use`). Steps spotlight real UI elements by targeting `data-tour="..."` attributes already present on them (`data-tour="search-bar"`/`"nav-pill-row"`/`"spot-to-let"`/etc., set directly on `SearchBar`/`TopNavPill`/`IconStack`) — a step with no selector renders a plain centered card instead of a spotlight. |
 | `SuperheroesModal.jsx` | To-let-spotter leaderboard (ranked by `hero_points`), showing each spotter's self-chosen `hero_nickname` (never their real name — see `toletSpots.js` below). |
-| `LandingCard.jsx` | Pre-map splash shown on every fresh visit — 2×2 tile grid, "₹0 brokerage" badge, links out to `LegalModal.jsx` and to `/about`/`/contact`. |
+| `LandingCard.jsx` | Pre-map splash shown on every fresh visit — 2×2 tile grid, "₹0 brokerage" badge, links out to `LegalModal.jsx` and to `/about`/`/contact`. Its own "Share" button's WhatsApp message links to the real production URL (`https://chitwan-rent.vercel.app`) — confirmed current, not a leftover placeholder. |
 | `LegalModal.jsx` | Privacy Policy / Terms of Use as a modal — see the routing note above for how this differs from the standalone `/privacy`/`/termofuse` pages. |
 | `ScrollToTop.jsx` | Mounted once in `App.jsx`; resets scroll position on every client-side `<Link>` navigation between the standalone pages (React Router doesn't do this automatically). |
 | `StubModal.jsx` | Generic "coming soon" placeholder shell for not-yet-built features. |
@@ -309,7 +311,7 @@ dashboard" below.
 | `auth.js` | `requireAuth` middleware — verifies the per-user JWT, attaches `req.userId`. |
 | `dashboardAuth.js` | The internal dashboard's own, separate auth: signed session cookie (not a per-user JWT), IP-based login rate limiting, timing-safe password comparison. See "Internal dashboard" below. |
 | `geo.js` | `haversineDistanceMeters` + `isNearAnyRoute` (bus-route proximity). |
-| `email.js` | Every outbound email in the app, via Nodemailer/Gmail (`EMAIL_USER`/`EMAIL_PASS`). One HTML template shell per email type, all built with the same purple-header card style: `sendVerificationEmail`, `sendDeleteCodeEmail`, `sendReportRemovalEmail`, `sendInterestNotificationEmail`, `sendSeekerConfirmationEmail`, `sendFlatMatchDigest`, `sendSeekerMatchDigest`, `sendCombinedDigest`. Has the app's one `escapeHtml` helper — needed because these templates are the only place free-text user data (`users.name`, contact fields, report reasons, interest notes) gets interpolated into HTML. |
+| `email.js` | Every outbound email in the app, sent via **SendGrid** (`@sendgrid/mail`, `SENDGRID_API_KEY`) from `chitwanrent@gmail.com` — verified in SendGrid as a **Single Sender** (one specific address, not a whole domain). One HTML template shell per email type, all built with the same purple-header card style: `sendVerificationEmail`, `sendDeleteCodeEmail`, `sendReportRemovalEmail`, `sendInterestNotificationEmail`, `sendSeekerConfirmationEmail`, `sendFlatMatchDigest`, `sendSeekerMatchDigest`, `sendCombinedDigest`. Has the app's one `escapeHtml` helper — needed because these templates are the only place free-text user data (`users.name`, contact fields, report reasons, interest notes) gets interpolated into HTML. **Not the original transport** — this is the third: Nodemailer/Gmail SMTP (`EMAIL_USER`/`EMAIL_PASS`) shipped first but doesn't work on Render's free tier (outbound SMTP connections there time out); Resend (an HTTPS email API, not SMTP) replaced it next, but without a purchased/verified domain its only sending option is a shared sandbox address that only ever delivers to the Resend account's own signup email — useless for real users. SendGrid's Single Sender Verification is what actually solves this without owning a domain: one verified real address, sends to anyone, over HTTPS (so Render's SMTP block stays irrelevant either way). `EMAIL_USER`/`EMAIL_PASS` and `RESEND_API_KEY` are both fully removed — no dead config left behind. |
 | `verification.js` | `generateVerificationToken` / `generateUnsubscribeToken` (both 256-bit, URL-safe, plain-text — compared directly on lookup, not hashed, since they're link parameters rather than user-typed credentials) and `verifyListingByToken` — the one atomic `UPDATE ... RETURNING` that flips a flat from `pending_verification` to `available` and, in the same statement, sets `email_verified_at`, generates `delete_code_hash` and `unsubscribe_token`, and sets `next_digest_at = now() + 12h`. |
 | `deleteCode.js` | `generateDeleteCode` (10-digit, CSPRNG), `hashDeleteCode` (sha256, no salt — code is already high-entropy and machine-generated), `deleteCodeHashMatches` (timing-safe compare). |
 | `flatCodeVerification.js` | `verifyFlatDeleteCode(flatId, code)` — the code-format/eligibility/brute-force/hash-match check, extracted out of what used to be inline in `POST /:id/delete` so `POST /:id/mark-rented` can require the exact same check without duplicating it (see "Email verification & flat deletion / status" below). |
@@ -501,12 +503,22 @@ the real protection (the password itself).
 - **Auth:** one shared password (`DASHBOARD_PASSWORD` env var — server
   refuses login with a `503` if unset), no per-admin accounts. On success, a
   JWT-signed session cookie (`dashboard_session`) is issued: `HttpOnly`,
-  `SameSite=Lax`, `6h` `Max-Age`/expiry (both agree with each other),
-  `Secure` only when `NODE_ENV=production` (nothing currently enforces that
-  var actually gets set at deploy time — worth confirming as part of any real
-  deployment). `Path=/`, not narrowed to the dashboard's own API prefix — low
-  risk since no other route on this server reads this cookie, but broader
-  than strictly necessary. Login attempts are rate-limited by IP (5 attempts /
+  `6h` `Max-Age`/expiry (both agree with each other), `Path=/`, not narrowed
+  to the dashboard's own API prefix — low risk since no other route on this
+  server reads this cookie, but broader than strictly necessary.
+  `SameSite`/`Secure` are environment-conditional, not fixed: in production
+  (`NODE_ENV=production`) the cookie is `SameSite=None; Secure` — required
+  because the frontend (Vercel) and backend (Render) are different origins in
+  production, and `SameSite=Lax` cookies are **not** sent on cross-site
+  requests by default (this was a real bug: dashboard login appeared not to
+  persist in production because the session cookie was set successfully but
+  never sent back on the next request — fixed by this env-conditional
+  switch). In dev, it stays `SameSite=Lax` with no `Secure`, since local
+  `http://` would otherwise silently drop a `Secure` cookie. `NODE_ENV=production`
+  is now actually set on the Render deploy (previously this was a documented
+  gap — the var wasn't confirmed to be set at all, so `Secure` may never have
+  applied), so this environment-conditional logic is no longer resting on an
+  unconfirmed assumption. Login attempts are rate-limited by IP (5 attempts /
   15 min, `dashboard_login_attempts` table, same sliding-window shape as
   `deleteAttemptLimit.js`), and the password comparison itself is
   timing-safe (`crypto.timingSafeEqual`, not `===`). `requireDashboardAuth`
@@ -650,6 +662,38 @@ the real protection (the password itself).
 > state with zero corresponding code in the repo. Not something this session
 > built or touched — flagged here purely so this doc doesn't silently omit
 > real schema state.
+
+---
+
+## Deployment
+
+The app is **live, not local-only** — frontend, backend, and database each run
+on a separate host, which shapes a few things documented above:
+
+- **Frontend:** Vercel, serving `client/`'s Vite build output. `client/
+  vercel.json` adds one SPA rewrite rule (`{ "source": "/(.*)", "destination":
+  "/index.html" }`) — without it, direct navigation or a page refresh on any
+  client-side route (`/flatstatus`, `/internal/dashboard`, `/about`, etc.)
+  would 404, since Vercel would otherwise look for a real file at that path
+  instead of falling through to the SPA's own router. Vercel's rewrite
+  behavior checks the filesystem first, so real static assets (the JS/CSS
+  bundles, images) are unaffected — this only ever fires for paths with no
+  matching file.
+- **Backend:** Render, on its free tier — which spins the server down when
+  idle and cold-starts it on the next request, taking 30-60s. Two things
+  elsewhere in this doc exist specifically because of that: `email.js`'s move
+  through Resend to SendGrid, both chosen because they're HTTPS APIs rather
+  than SMTP (Render's free tier blocks/times-out outbound SMTP, which is what
+  broke the original Nodemailer/Gmail transport — see the `email.js` entry
+  above), and `InitialLoadScreen.jsx`'s rotating-tips loading card, built
+  specifically to make that cold-start wait feel like part of the app instead
+  of a stalled page (see the "Map chrome" table above).
+- **Database:** Neon (managed PostgreSQL).
+- **Cross-origin consequences:** frontend and backend being different origins
+  in production is also why the internal dashboard's session cookie needed
+  its `SameSite=None; Secure` fix (see "Internal dashboard" above) — a
+  same-origin-only cookie policy silently doesn't survive a split-host
+  deployment like this one.
 
 ---
 

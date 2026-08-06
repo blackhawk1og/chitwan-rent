@@ -2,6 +2,15 @@
 
 A map-first, brokerage-free rental listing platform for Chitwan district, Nepal.
 
+## Live Demo
+
+**[chitwan-rent.vercel.app](https://chitwan-rent.vercel.app)**
+
+Frontend on Vercel, backend on Render (free tier), database on Neon. The
+backend cold-starts after a period of inactivity — the first request can take
+30-60s, during which the app shows an interactive loading screen rather than a
+blank page.
+
 ## Overview
 
 Renters browse available flats as pins on an interactive map instead of scrolling
@@ -92,7 +101,7 @@ code.
    | `JWT_SECRET` | **Required** for real use (has an insecure dev default) | Signs the dummy-auth JWT |
    | `CLIENT_ORIGIN` | Optional | Locks CORS to one exact origin; any `http://localhost:<port>` is trusted if unset |
    | `SERVER_BASE_URL` | Optional (defaults to `http://localhost:$PORT`) | Base URL used to build links inside emails |
-   | `EMAIL_USER` / `EMAIL_PASS` | Required for email to send | Gmail address + [App Password](https://myaccount.google.com/apppasswords) used to send verification/digest/notification emails |
+   | `SENDGRID_API_KEY` | Required for email to send | [SendGrid](https://app.sendgrid.com/settings/api_keys) API key, used to send verification/digest/notification emails. Sends from `chitwanrent@gmail.com`, verified as a SendGrid **Single Sender** (one address, not a full domain) |
    | `DIGEST_REPLY_TO` | Optional | Reply-To address on weekly digest emails |
    | `DASHBOARD_PASSWORD` | Required only for the internal operator dashboard | Shared password gating that one internal-only tool |
 
