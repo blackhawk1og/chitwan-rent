@@ -21,6 +21,7 @@ import { usePois } from "../hooks/usePois.js";
 import { useCreateFlat } from "../hooks/useCreateFlat.js";
 import { useCreateSeekerPin } from "../hooks/useCreateSeekerPin.js";
 import { useCreateToletSpot } from "../hooks/useCreateToletSpot.js";
+import { useUploadToletPhoto } from "../hooks/useUploadToletPhoto.js";
 import { useCreateRentReport } from "../hooks/useCreateRentReport.js";
 import { usePinDropFlow } from "../hooks/usePinDropFlow.js";
 import { formatRs, formatRsCompact, bhkLabel } from "../lib/format.js";
@@ -43,6 +44,7 @@ import InitialLoadScreen from "./InitialLoadScreen.jsx";
 import FilterModal from "./FilterModal.jsx";
 import FlatsLayer from "./FlatsLayer.jsx";
 import ToletSpotsLayer from "./ToletSpotsLayer.jsx";
+import ToletSpotDetailCard from "./ToletSpotDetailCard.jsx";
 import BusRoutesLayer from "./BusRoutesLayer.jsx";
 import PoisLayer from "./PoisLayer.jsx";
 import GeneralPoisLayer, { GENERAL_POI_CATEGORIES } from "./GeneralPoisLayer.jsx";
@@ -192,7 +194,7 @@ export default function MapShell() {
   }, [flatsLoading]);
   const { data: areas = [] } = useAreas();
   const { data: places = [] } = usePlaces();
-  const { data: toletSpots = [] } = useToletSpots(filters.showToletBoards);
+  const { data: toletSpots = [] } = useToletSpots();
   const { data: busRoutes = [] } = useBusRoutes(busRoutesOn);
   const { data: schoolPois = [] } = usePois("school,college", schoolsOn);
   // No manual toggle — a persistent, zoom-gated layer (matches Google Maps'
@@ -202,7 +204,11 @@ export default function MapShell() {
   const { data: generalPois = [] } = usePois(GENERAL_POI_CATEGORIES);
 
   const [selectedItem, setSelectedItem] = useState(null); // { type: 'flat'|'seeker', data } | null
-  const [expandedItem, setExpandedItem] = useState(null); // same shape, drives the full detail card
+  // 'tolet' skips selectedItem entirely — a to-let pin click goes straight to
+  // its detail card (see ToletSpotsLayer's onSelect below), no intermediate
+  // ListingChip preview step like flats/seekers get, since there's only a
+  // photo and two actions to show, not enough to warrant a two-step reveal.
+  const [expandedItem, setExpandedItem] = useState(null); // { type: 'flat'|'seeker'|'tolet', data } | null — drives the full detail card
   const [nearbyFlatsPopup, setNearbyFlatsPopup] = useState(null); // flat[] | null — see NearbyFlatsModal
 
   const [justSubmittedFlats, setJustSubmittedFlats] = useState([]);
@@ -210,6 +216,7 @@ export default function MapShell() {
   const createFlat = useCreateFlat();
   const createSeekerPin = useCreateSeekerPin();
   const createToletSpot = useCreateToletSpot();
+  const uploadToletPhoto = useUploadToletPhoto();
   const createRentReport = useCreateRentReport();
   // Covers the full submit span (inline login + create), not just
   // createSeekerPin's own mutation state — see handleSubmitSeekerForm.
@@ -288,7 +295,11 @@ export default function MapShell() {
   // Spot a To-Let: its own lightweight flow — no onboarding step, and the
   // form's fields must survive the "pick on map" detour, so they're lifted
   // up here rather than living inside the (temporarily unmounted) modal.
+  // toletPhoto is the base64 preview (unchanged, local-only, never sent to
+  // the server); toletPhotoFile is the raw File — that's what actually gets
+  // uploaded to Cloudinary on submit (see handleSubmitToletSpot below).
   const [toletPhoto, setToletPhoto] = useState(null);
+  const [toletPhotoFile, setToletPhotoFile] = useState(null);
   const [toletName, setToletName] = useState("");
   const [toletMessage, setToletMessage] = useState("");
   const [toletLocation, setToletLocation] = useState(null);
@@ -326,10 +337,9 @@ export default function MapShell() {
   }, [flats, justSubmittedFlats]);
 
   const displayedToletSpots = useMemo(() => {
-    const base = filters.showToletBoards ? toletSpots : [];
-    const existingIds = new Set(base.map((s) => s.id));
-    return [...base, ...justSubmittedToletSpots.filter((s) => !existingIds.has(s.id))];
-  }, [filters.showToletBoards, toletSpots, justSubmittedToletSpots]);
+    const existingIds = new Set(toletSpots.map((s) => s.id));
+    return [...toletSpots, ...justSubmittedToletSpots.filter((s) => !existingIds.has(s.id))];
+  }, [toletSpots, justSubmittedToletSpots]);
 
   const closeRouteModal = () => navigate("/");
   const closeQuickModal = () => setQuickModal(null);
@@ -657,6 +667,7 @@ export default function MapShell() {
 
   const resetToletFlow = () => {
     setToletPhoto(null);
+    setToletPhotoFile(null);
     setToletName("");
     setToletMessage("");
     setToletLocation(null);
@@ -685,11 +696,18 @@ export default function MapShell() {
     setToletPicking(false);
   };
 
+  // Two sequential requests, not one — upload first (Cloudinary), then
+  // create the row with the URL that comes back. uploadToletPhoto.isError
+  // and createToletSpot.isError are surfaced as two distinct messages in
+  // SpotToLetModal (uploadError vs submitError) rather than one generic
+  // failure, so "the photo never made it up" reads differently from "the
+  // photo uploaded fine but the pin itself failed to save."
   const handleSubmitToletSpot = async () => {
-    if (!toletPhoto || !toletLocation) return;
+    if (!toletPhotoFile || !toletLocation) return;
     try {
+      const { url } = await uploadToletPhoto.mutateAsync(toletPhotoFile);
       const created = await createToletSpot.mutateAsync({
-        photo_url: toletPhoto,
+        photo_url: url,
         name: toletName || null,
         message: toletMessage || null,
         lat: toletLocation.lat,
@@ -700,7 +718,7 @@ export default function MapShell() {
       resetToletFlow();
       setQuickModal("superheroes");
     } catch {
-      // error surfaced via createToletSpot.isError in the form
+      // error surfaced via uploadToletPhoto.isError / createToletSpot.isError in the form
     }
   };
 
@@ -832,7 +850,10 @@ export default function MapShell() {
               onSelect={(flat) => setExpandedItem({ type: "flat", data: flat })}
               onNearbyCluster={setNearbyFlatsPopup}
             />
-            <ToletSpotsLayer spots={displayedToletSpots} />
+            <ToletSpotsLayer
+              spots={displayedToletSpots}
+              onSelect={(spot) => setExpandedItem({ type: "tolet", data: spot })}
+            />
             {schoolsOn && <PoisLayer pois={schoolPois} />}
             <GeneralPoisLayer pois={generalPois} />
           </>
@@ -1089,6 +1110,7 @@ export default function MapShell() {
         <SpotToLetModal
           photoDataUrl={toletPhoto}
           onPhotoChange={setToletPhoto}
+          onFileSelect={setToletPhotoFile}
           name={toletName}
           onNameChange={setToletName}
           message={toletMessage}
@@ -1098,6 +1120,8 @@ export default function MapShell() {
           onPickOnMap={handlePickToletOnMap}
           onSubmit={handleSubmitToletSpot}
           onCancel={handleCancelToletFlow}
+          uploading={uploadToletPhoto.isPending}
+          uploadError={uploadToletPhoto.isError ? "Couldn't upload photo — please try again." : null}
           submitting={createToletSpot.isPending}
           submitError={createToletSpot.isError ? "Something went wrong — please try again." : null}
         />
@@ -1209,6 +1233,10 @@ export default function MapShell() {
 
       {expandedItem?.type === "seeker" && (
         <SeekerDetailCard seeker={expandedItem.data} onClose={() => setExpandedItem(null)} />
+      )}
+
+      {expandedItem?.type === "tolet" && (
+        <ToletSpotDetailCard spot={expandedItem.data} onClose={() => setExpandedItem(null)} />
       )}
 
       {nearbyFlatsPopup && (

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sofa, Box, ShieldCheck, ShieldOff, Mail, Bus, ChevronDown } from "lucide-react";
+import { Sofa, Box, ShieldCheck, ShieldOff, Bus, ChevronDown } from "lucide-react";
 import Modal from "./Modal.jsx";
 import Switch from "./Switch.jsx";
 import Pill from "./ui/Pill.jsx";
@@ -188,21 +188,6 @@ export default function FilterModal({ initialFilters, onApply, onClose }) {
                   {opt.label}
                 </Pill>
               ))}
-            </div>
-          </div>
-
-          <div>
-            <SectionLabel>To-let boards spotted by users</SectionLabel>
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-surface-alt px-4 py-3">
-              <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-text-primary">
-                <Mail size={15} className="shrink-0" />
-                <span className="min-w-0">Show To-Let boards</span>
-              </div>
-              <Switch
-                checked={draft.showToletBoards}
-                onChange={(v) => setDraft((d) => ({ ...d, showToletBoards: v }))}
-                label="Show To-Let boards"
-              />
             </div>
           </div>
 

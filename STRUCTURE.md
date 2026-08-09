@@ -156,7 +156,7 @@ visits).
 | `RentCapConfirmModal.jsx` | "Double-check this pin?" — shown by `AddFlatForm` only when the soft rent-cap warning is active; see "Rent-cap system" below. |
 | `DropSeekerPinForm.jsx` | "Find a Flat" — the seeker's preferences + contact form; same digest-consent copy as `ListFlatDetailsForm` when `lookingFor === "room"`. Submitting when the entered email already has other `seeker_pins` rows triggers `ArchiveCheckPinsModal.jsx` first — see "Seeker-pin archive flow" below. |
 | `ArchiveCheckPinsModal.jsx` | Shown before creating a new seeker pin when the submitted email already has existing pins (active and/or archived) on file — lets the submitter archive some/all/none of their old ones. See "Seeker-pin archive flow" below. |
-| `SpotToLetModal.jsx` | To-let board photo capture/upload + location (GPS or pick-on-map) + spotter name/message. |
+| `SpotToLetModal.jsx` | To-let board photo capture/upload + location (GPS or pick-on-map) + spotter name/message. Submitting is a two-step request, not one: the raw photo `File` (kept alongside the local base64 preview, which still only drives the in-modal thumbnail) uploads to Cloudinary first via `POST /api/tolet-spots/upload-photo` (`hooks/useUploadToletPhoto.js`), then the returned URL is sent as `photo_url` to `POST /api/tolet-spots` — see "To-Let spot photo storage" below. Shows a distinct "Uploading photo…" state before "Putting it on the map…", and a separate error message if the upload step itself fails. |
 | `RentReportForm.jsx` | Anonymous "what rent are you paying" data point from the empty-map quick-action menu — rent, BHK, and gated/not-gated are required; furnishing and parking-spot count are optional (`rent_reports.furnishing`/`parking_for`, mirroring `flats`' own vocabulary for those two fields). Write-only in practice right now — see the `RentReportsLayer` note above; submitted data has no read-side display anywhere in the client (it does now show up in the internal dashboard — see "Internal dashboard" below — but that's an operator view, not a public one). |
 | `InterestForm.jsx` | "I'm interested" contact-capture form, used from `FlatDetailPanel`. Collects **email + phone (required, no name field)**, plus three optional fields — Move-in Timeline (same Pill selector as `ListFlatDetailsForm`'s "Available from"), "You are" gender (same `ToggleButton` trio as `DropSeekerPinForm`'s own gender field), and Parking required (same boolean `ToggleButton` pair as `DropSeekerPinForm`, with a conditional "number of spots" `TextField` — same numeric pattern as `AddFlatForm`'s "Parking for" — shown only once parking is marked required). See "Interest submissions" below for what happens server-side. |
 | `AuthGateModal.jsx` | Dummy sign-in gate — email and/or phone, no password/OTP; blocks any action that needs an identity. |
@@ -283,7 +283,7 @@ server/
 |---|---|
 | `flats.js` | List/filter/get/create flats, photo attach, comments, ratings, "I'm interested" submissions (see "Interest submissions" below), `POST /:id/delete`, and `POST /:id/mark-rented` (see "Email verification & flat deletion / status" below). A new listing is created with `status = 'pending_verification'` and only ever reaches `'available'` via the emailed verification link — there is **no** auto-flip timer anymore. `GET /` unconditionally excludes `pending_verification` rows, anything with `report_count >= 3`, **and (added alongside mark-rented) anything with `status = 'rented'`** — the last one closes a real gap: before it existed, a rented flat rendered on the default map exactly like a live one, since nothing on the client reads `flat.status` for marker styling and the map's default fetch sends no `status` filter at all (see `lib/filters.js` above). `?status=available` *also* excludes `is_seed = true` rows. |
 | `seekerPins.js` | List/get/create seeker pins, plus `GET /by-email` (see "Seeker-pin archive flow" below). Creation sets `unsubscribe_token` and `next_digest_at` (`now() + 12h`) — seeker pins have no verification step, so creation is the moment a pin becomes "active" for matching purposes. |
-| `toletSpots.js` | List/create to-let board spots; creating one increments the spotter's `hero_points` and flips their role to `superhero`. The submission's `name` field is really a self-chosen nickname now (relabeled in `SpotToLetModal.jsx`) — set once into `users.hero_nickname` via `COALESCE` (first submission wins, never overwritten) and deliberately never written to `users.name`, so a made-up nickname can never corrupt someone's real name. `GET /` joins in `hero_nickname` for `ToletSpotsLayer.jsx`; `superheroes.js` does the same for the leaderboard — neither ever exposes `users.name`. |
+| `toletSpots.js` | List/create to-let board spots; creating one increments the spotter's `hero_points` and flips their role to `superhero`. The submission's `name` field is really a self-chosen nickname now (relabeled in `SpotToLetModal.jsx`) — set once into `users.hero_nickname` via `COALESCE` (first submission wins, never overwritten) and deliberately never written to `users.name`, so a made-up nickname can never corrupt someone's real name. `GET /` joins in `hero_nickname` for `ToletSpotsLayer.jsx`; `superheroes.js` does the same for the leaderboard — neither ever exposes `users.name`. Also has `POST /upload-photo` (Cloudinary) and `POST /:id/report` — see "To-Let spot photo storage" below. |
 | `areas.js` | The curated ward/tole list (`areasData.js`) merged with live per-area flat counts — always returns every seeded area, even with zero current listings. Powers the `Neighbourhood` filter dropdown. |
 | `places.js` | The full OSM-sourced places gazetteer (villages/towns/suburbs/neighbourhoods/hamlets) — powers the search bar's local typeahead alongside flat `area` values. Deliberately separate from `areas.js`. |
 | `pois.js` | Schools/colleges/restaurants/hospitals/temples/landmarks/pharmacies, optionally filtered by `?category=`. |
@@ -319,6 +319,7 @@ dashboard" below.
 | `deleteAttemptLimit.js` | `checkDeleteAttemptLimit` / `recordFailedDeleteAttempt` — brute-force throttle shared by both `POST /:id/delete` and `POST /:id/mark-rented` (5 failed attempts / 15 min, scoped to the flat ID — a wrong guess on either action counts toward the same lockout, since it's the same code either way), backed by `flat_delete_attempts`. |
 | `cleanupExpiredListings.js` | Hourly job (`startExpiredListingsCleanup`): hard-deletes `flats` rows still `pending_verification` 24h after creation (owner never clicked the link). |
 | `digestJob.js` | The weekly match-digest job — see below. |
+| `cloudinary.js` | Configures the shared Cloudinary client (`CLOUDINARY_CLOUD_NAME`/`CLOUDINARY_API_KEY`/`CLOUDINARY_API_SECRET`) used by `routes/toletSpots.js`'s `POST /upload-photo` — see "To-Let spot photo storage" below. |
 
 ### Email verification & flat deletion / status
 
@@ -488,6 +489,40 @@ No `flats.interest_count` materialized column was added (considered, but
 judged not worth a second write-path to keep in sync at this app's traffic
 size — the dashboard section alone satisfies the visibility gap).
 
+### To-Let spot photo storage
+
+`tolet_spots.photo_url` moved from base64-in-Postgres to Cloudinary. Every
+row that existed before this migration had its `photo_url` explicitly
+cleared to `NULL` (`db/clear-tolet-spot-photos.js`, a one-off cleanup script
+— same `remove-*.js` pattern as `remove-blue-pois.js` etc. below, not a
+schema migration, since no column/table changed) — those old base64 values
+were never migrated forward, just dropped; every other column
+(`id`/`spotter_id`/`lat`/`lng`/`report_count`/`status`/etc.) on those rows is
+untouched.
+
+Every *new* spot now stores a real Cloudinary URL instead. `src/lib/
+cloudinary.js` configures the shared client from three server-only env vars
+(`CLOUDINARY_CLOUD_NAME`/`CLOUDINARY_API_KEY`/`CLOUDINARY_API_SECRET` — never
+sent to the client; there's no unsigned/public-key browser-upload path here,
+every upload goes through this server's own auth). `SpotToLetModal.jsx`'s
+submit is two sequential requests: `POST /api/tolet-spots/upload-photo`
+(`requireAuth`, `multer` with `memoryStorage` — not `diskStorage`, since
+Render's filesystem is ephemeral — streams the buffer straight to
+Cloudinary's `tolet-spots` folder, no disk write at all) returns a
+`secure_url`, which is then sent as `photo_url` to the existing
+`POST /api/tolet-spots`. The modal shows a distinct "Uploading photo…" state
+for the first request before "Putting it on the map…" for the second, and
+the two failure modes surface as separate messages (`uploadError` vs.
+`submitError`) rather than one generic one.
+
+**Flat listing photos are a different, untouched path.** `flats.photos`
+still reads as base64 client-side (`FileReader.readAsDataURL` in
+`ListFlatSuccessModal.jsx`) and stores directly in Postgres via
+`hooks/useAddFlatPhotos.js` — the same pattern `tolet_spots.photo_url` used
+before this migration. Flagged here since it's the same shape, not migrated
+alongside it — doing so wasn't part of this change and would need its own
+confirmation first.
+
 ### Internal dashboard
 
 A single internal-only, password-protected operator tool — not linked from any
@@ -636,7 +671,9 @@ the real protection (the password itself).
   > does have one.
 - **Cleanup scripts** (`remove-bank-pois.js`, `remove-noisy-shop-pois.js`,
   `remove-hotel-pois.js`, `remove-blue-pois.js`) — one-off deletions of POI
-  categories that were later decided against.
+  categories that were later decided against. `clear-tolet-spot-photos.js`
+  is the same shape but clears a column rather than deleting rows — see "To-
+  Let spot photo storage" above.
 
 > **Uncommitted DB drift: `rent_reports.is_dummy`.** An earlier session built
 > `add-rent-reports-is-dummy.js` (migration) and `seed-dummy-rent-reports.js`

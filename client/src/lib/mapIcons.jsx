@@ -1,5 +1,6 @@
 import L from "leaflet";
 import { renderToStaticMarkup } from "react-dom/server";
+import { Calendar } from "lucide-react";
 
 // Small colored dot/home-style pin used for individual (non-clustered) markers.
 export function createDotIcon(IconComponent, { bg = "#7c3aed", size = 28 } = {}) {
@@ -29,7 +30,12 @@ export function createDotIcon(IconComponent, { bg = "#7c3aed", size = 28 } = {})
   });
 }
 
-// Two-line cluster badge: bold count on top, smaller muted subtext below.
+// Cluster badge: bold count (+ optional smaller muted subtext below, when
+// line2 is passed — flats' own cluster badge uses this two-line form: "X
+// flats" / "AVLB X"). Omitting line2 (see ToletSpotsLayer's single-line "2
+// TO-LET" badge) collapses it to one compact line instead of leaving
+// two-line-sized padding around a single line — the padding itself is
+// slightly shorter/wider in that case, sized for one line rather than two.
 // "light" (the flat-count badge) renders as a dark, semi-transparent glass
 // card — matches the map's own night theme instead of sitting on top of it
 // as a bright white sticker. "teal" (the seeker-count badge) already reads
@@ -52,7 +58,7 @@ export function createClusterBadgeIcon({ line1, line2, tone = "light" }) {
         alignItems: "center",
         justifyContent: "center",
         minWidth: 60,
-        padding: "6px 12px",
+        padding: line2 ? "6px 12px" : "7px 14px",
         borderRadius: 16,
         background: bg,
         boxShadow,
@@ -547,6 +553,67 @@ export function createFlatInfoChipIcon({ bhk, rent, rating, gated, listingType, 
     // the flat's lat/lng — not the chip's center like before. -1 to match
     // the tail's own -1px overlap (see the tail's marginTop above).
     iconAnchor: [s.anchorX, stackHeight + TAIL_HEIGHT_PX - 1],
+  });
+}
+
+// To-Let spot marker: an orange pill ("To-Let" + a small calendar glyph) with
+// a pointed tail, same chip+tail anchoring convention as
+// createFlatInfoChipIcon/createYourPinIcon below — every other individual
+// (non-teardrop) marker in this app anchors to its exact coordinate via a
+// visible tip, so this follows suit rather than floating as a bare pill with
+// no anchor point. Built on the same zero-size-anchor-box + translateX(-50%)
+// trick as createYourPinIcon, since it's simpler than hand-computing a fixed
+// pixel width for content that's visually centered either way. Single fixed
+// marker type (not swapped per category like createDotIcon/createPoiPinIcon
+// above), so — like createYourPinIcon/createSearchResultPinIcon — its icon
+// glyph is hardcoded here rather than taking an IconComponent param.
+const TOLET_PILL_BG = "#b45309"; // deliberately a darker amber than the rest of the to-let UI (SpotToLetModal/IconStack still use the lighter accent-orange, #f59e0b) — this pin's own color, set explicitly
+const TOLET_PILL_TAIL_HEIGHT_PX = 6;
+
+export function createToLetPillIcon() {
+  const html = renderToStaticMarkup(
+    <div style={{ position: "relative", width: 0, height: 0 }}>
+      <div
+        style={{
+          position: "absolute",
+          bottom: TOLET_PILL_TAIL_HEIGHT_PX,
+          left: 0,
+          transform: "translateX(-50%)",
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
+          padding: "3px 9px",
+          borderRadius: 9999,
+          background: TOLET_PILL_BG,
+          boxShadow: "0 3px 10px rgba(0,0,0,0.45)",
+          fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+          whiteSpace: "nowrap",
+        }}
+      >
+        <Calendar size={13} color="#ffffff" strokeWidth={2.5} />
+        <span style={{ fontSize: 12, fontWeight: 800, color: "#ffffff" }}>To-Let</span>
+      </div>
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          transform: "translateX(-50%)",
+          width: 0,
+          height: 0,
+          borderLeft: "6px solid transparent",
+          borderRight: "6px solid transparent",
+          borderTop: `${TOLET_PILL_TAIL_HEIGHT_PX}px solid ${TOLET_PILL_BG}`,
+        }}
+      />
+    </div>
+  );
+
+  return L.divIcon({
+    html,
+    className: "chitwan-pin-icon",
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
   });
 }
 

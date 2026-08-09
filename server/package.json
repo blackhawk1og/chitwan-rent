@@ -34,14 +34,17 @@
     "add:dashboard-tables": "node db/add-dashboard-tables.js",
     "add:flats-report-removal-email-sent-at": "node db/add-flats-report-removal-email-sent-at.js",
     "add:flat-interests-preferences": "node db/add-flat-interests-preferences.js",
-    "add:flat-interests-parking-count": "node db/add-flat-interests-parking-count.js"
+    "add:flat-interests-parking-count": "node db/add-flat-interests-parking-count.js",
+    "add:tolet-spot-reports": "node db/add-tolet-spot-reports.js"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.6",
+    "cloudinary": "^2.10.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.2.0",
     "pg": "^8.13.1"
   }
 }

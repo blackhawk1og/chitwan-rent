@@ -1,10 +1,11 @@
 import { useRef } from "react";
-import { Mail, MapPin, Crosshair, Map as MapIcon, AlertTriangle } from "lucide-react";
+import { Mail, MapPin, Crosshair, Map as MapIcon } from "lucide-react";
 import Modal from "./Modal.jsx";
 
 export default function SpotToLetModal({
   photoDataUrl,
   onPhotoChange,
+  onFileSelect,
   name,
   onNameChange,
   message,
@@ -14,6 +15,8 @@ export default function SpotToLetModal({
   onPickOnMap,
   onSubmit,
   onCancel,
+  uploading,
+  uploadError,
   submitting,
   submitError,
 }) {
@@ -22,12 +25,18 @@ export default function SpotToLetModal({
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Raw File kept alongside the base64 preview — onPhotoChange still only
+    // drives the local <img> thumbnail below, unchanged; onFileSelect is
+    // what actually gets uploaded to Cloudinary on submit (see MapShell.jsx's
+    // handleSubmitToletSpot).
+    onFileSelect(file);
     const reader = new FileReader();
     reader.onload = () => onPhotoChange(reader.result);
     reader.readAsDataURL(file);
   };
 
   const isValid = Boolean(photoDataUrl) && Boolean(location);
+  const busy = uploading || submitting;
 
   return (
     <Modal onClose={onCancel} maxWidthClass="max-w-md">
@@ -41,13 +50,6 @@ export default function SpotToLetModal({
             See a To-Let board? Put it on the map — help the next flat-hunter skip the broker.
           </p>
         </div>
-      </div>
-
-      <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3">
-        <AlertTriangle size={16} className="mt-0.5 shrink-0 text-red-400" />
-        <p className="text-sm font-semibold text-red-400">
-          This feature is temporarily unavailable. We're working on it — please check back soon.
-        </p>
       </div>
 
       <input
@@ -72,7 +74,7 @@ export default function SpotToLetModal({
         )}
       </button>
       <p className="mt-2 text-xs text-text-muted">
-        ① Shoot just the board — our AI auto-rejects photos with faces or number plates 🙏
+        Please take a clear photo ensuring that all numbers are clearly visible and legible.
       </p>
 
       <div className="mt-4 rounded-2xl border border-white/10 bg-surface-alt px-4 py-3">
@@ -127,15 +129,16 @@ export default function SpotToLetModal({
         → both appear on the Superheroes board & on your spotted pin ✨
       </p>
 
+      {uploadError && <p className="mt-3 text-sm text-red-400">{uploadError}</p>}
       {submitError && <p className="mt-3 text-sm text-red-400">{submitError}</p>}
 
       <button
         type="button"
         onClick={onSubmit}
-        disabled={!isValid || submitting}
+        disabled={!isValid || busy}
         className="mt-5 w-full rounded-full bg-accent-orange py-3 text-sm font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {submitting ? "Putting it on the map…" : "📮 Put it on the map"}
+        {uploading ? "Uploading photo…" : submitting ? "Putting it on the map…" : "📮 Put it on the map"}
       </button>
     </Modal>
   );

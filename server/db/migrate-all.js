@@ -55,6 +55,7 @@ const MIGRATIONS = [
   "add-flats-report-removal-email-sent-at.js",
   "add-flat-interests-preferences.js",
   "add-flat-interests-parking-count.js",
+  "add-tolet-spot-reports.js",
 ];
 
 // Each script (run-schema.js and every migration) is already fully

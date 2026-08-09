@@ -129,6 +129,7 @@ function Dashboard({ onLoggedOut }) {
           <RecentListingsSection />
           <ReportsSection />
           <InterestsSection />
+          <ToletSpotsSection />
           <DigestHealthSection />
           <RateLimitLookupSection />
           <DataHygieneSection />
@@ -424,6 +425,89 @@ function InterestsSection() {
           rows={interestsQuery.data ?? []}
           emptyLabel="No interest submissions yet."
         />
+      )}
+    </SectionCard>
+  );
+}
+
+// --- To-Let spots -----------------------------------------------------
+// Two tables, one section: active and removed. photo_url is deliberately
+// absent from both — see routes/dashboard.js's GET /tolet-spots, which
+// never selects it in the first place, so there's nothing to render here
+// even by accident.
+function formatLatLng(row) {
+  if (row.lat == null || row.lng == null) return "—";
+  return `${Number(row.lat).toFixed(4)}, ${Number(row.lng).toFixed(4)}`;
+}
+
+// Shared by both tables — the removed one appends its own audit column.
+const TOLET_BASE_COLUMNS = [
+  { key: "id", label: "ID" },
+  { key: "created_at", label: "Spotted", render: (r) => `${formatRelativeTime(r.created_at)} ago` },
+  { key: "hero_nickname", label: "Spotter", render: (r) => r.hero_nickname || "—" },
+  { key: "latlng", label: "Lat / Lng", render: formatLatLng },
+  { key: "report_count", label: "Reports" },
+  { key: "status", label: "Status" },
+];
+
+function ToletSpotsSection() {
+  const toletQuery = useQuery({ queryKey: ["dashboard-tolet-spots"], queryFn: dashboardApi.getToletSpots });
+
+  return (
+    <SectionCard
+      title="To-Let spots"
+      subtitle="Spotted board pins, most recent first. Board photos are deliberately not shown or queried here."
+    >
+      {toletQuery.isLoading ? (
+        <p className="text-sm text-text-muted">Loading…</p>
+      ) : toletQuery.isError ? (
+        <p className="text-sm text-red-400">{toletQuery.error.message}</p>
+      ) : (
+        <>
+          <h3 className="text-xs font-bold uppercase tracking-wide text-text-muted">
+            Active ({toletQuery.data.active.length})
+          </h3>
+          <div className="mt-2">
+            <Table
+              columns={TOLET_BASE_COLUMNS}
+              rows={toletQuery.data.active}
+              emptyLabel="No active to-let spots right now."
+            />
+          </div>
+
+          <h3 className="mt-6 text-xs font-bold uppercase tracking-wide text-text-muted">
+            Removed ({toletQuery.data.removed.length})
+          </h3>
+          <div className="mt-2">
+            <Table
+              columns={[
+                ...TOLET_BASE_COLUMNS,
+                {
+                  key: "audit_report_count",
+                  label: "Audit rows",
+                  // Should always equal the Reports column beside it (that
+                  // one is the materialized counter, this one counts the
+                  // actual tolet_spot_reports rows). Flagged in red when
+                  // they disagree — that's a real audit-trail problem worth
+                  // seeing, not a display quirk to paper over.
+                  render: (r) =>
+                    r.audit_report_count === r.report_count ? (
+                      <span className="text-accent-teal">{r.audit_report_count} ✓</span>
+                    ) : (
+                      <span className="text-red-400">{r.audit_report_count} ≠ {r.report_count}</span>
+                    ),
+                },
+              ]}
+              rows={toletQuery.data.removed}
+              emptyLabel="No removed to-let spots."
+            />
+          </div>
+
+          <p className="mt-3 flex items-start gap-1.5 text-xs text-text-muted">
+            <AlertTriangle size={13} className="mt-0.5 shrink-0 text-accent-orange" />
+            {toletQuery.data.seedGap}
+          </p>
+        </>
       )}
     </SectionCard>
   );

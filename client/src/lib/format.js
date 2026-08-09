@@ -27,6 +27,15 @@ const RELATIVE_UNITS = [
   { unit: "minute", ms: 60 * 1000 },
 ];
 
+// "9 Aug" style — used by ToletSpotDetailCard's "To-Let spotted · 9 Aug"
+// header, where formatRelativeTime's "3 days ago" wording doesn't fit.
+// en-GB (not en-US) specifically for its day-before-month order in this
+// combo — en-US would print "Aug 9" instead.
+export function formatShortDate(dateInput) {
+  if (!dateInput) return "";
+  return new Date(dateInput).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
 export function formatRelativeTime(dateInput) {
   if (!dateInput) return "recently";
   const diffMs = Date.now() - new Date(dateInput).getTime();

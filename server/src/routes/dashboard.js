@@ -419,4 +419,70 @@ router.get("/interests", async (req, res) => {
   }
 });
 
+// --- 8. To-Let spots --------------------------------------------------
+// GET /tolet-spots — both tables in one response (same composite shape as
+// /digest-health above), since they're two halves of one dashboard section.
+//
+// photo_url is deliberately NOT selected in either query. Every column is
+// listed explicitly rather than `t.*` (which routes/toletSpots.js's own
+// public GET / does use) specifically so photo_url can't leak into this
+// view — board photos are user-submitted images of the street, and there's
+// no moderation reason to render them here.
+//
+// Same spotter_id -> users LEFT JOIN as that public route: the join is LEFT
+// (not INNER) because spotter_id is nullable, so a spot with no resolvable
+// spotter still appears with hero_nickname null rather than vanishing, and
+// it's hero_nickname (never users.name) for the same reason the public
+// route and superheroes.js use it — a self-chosen nickname, not a real
+// identity.
+router.get("/tolet-spots", async (req, res) => {
+  try {
+    const active = await query(
+      `SELECT t.id, t.created_at, t.lat, t.lng, t.report_count, t.status, u.hero_nickname
+       FROM tolet_spots t
+       LEFT JOIN users u ON u.id = t.spotter_id
+       WHERE t.status != 'removed'
+       ORDER BY t.created_at DESC
+       LIMIT 200`
+    );
+
+    // audit_report_count comes from the tolet_spot_reports rows themselves,
+    // while report_count is the materialized counter on tolet_spots that
+    // POST /:id/report increments. They should always agree; showing both
+    // side by side is the point — a mismatch is exactly the kind of thing
+    // this moderation view exists to surface, so they're deliberately not
+    // collapsed into one number.
+    const removed = await query(
+      `SELECT t.id, t.created_at, t.lat, t.lng, t.report_count, t.status, u.hero_nickname,
+              COALESCE(r.audit_count, 0)::int AS audit_report_count
+       FROM tolet_spots t
+       LEFT JOIN users u ON u.id = t.spotter_id
+       LEFT JOIN (
+         SELECT tolet_spot_id, COUNT(*)::int AS audit_count
+         FROM tolet_spot_reports
+         GROUP BY tolet_spot_id
+       ) r ON r.tolet_spot_id = t.id
+       WHERE t.status = 'removed'
+       ORDER BY t.created_at DESC
+       LIMIT 200`
+    );
+
+    res.json({
+      active: active.rows,
+      removed: removed.rows,
+      // Same "state a gap explicitly rather than guess at it" treatment as
+      // rentReports in /hygiene above. tolet_spots genuinely has no is_seed
+      // column (verified against information_schema, not assumed), so there
+      // is no seed-vs-real split to show for this table — and db/seed.js
+      // does insert to-let spots, so unlike rent_reports these rows are NOT
+      // all real by construction; they simply can't be told apart.
+      seedGap:
+        "tolet_spots has no is_seed column, so seed and real spots cannot be distinguished here. Note that db/seed.js does create to-let spots, so some rows below are seeded.",
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch to-let spots" });
+  }
+});
+
 export default router;

@@ -7,7 +7,6 @@ export const DEFAULT_FILTERS = {
   furnishing: null, // 'furnished' | 'unfurnished' | null
   gated: null, // 'gated' | 'not_gated' | null
   postedWithin: "all", // '7' | '30' | '90' | '180' | 'all'
-  showToletBoards: false,
   nearBusRoute: false,
 };
 
@@ -36,7 +35,6 @@ export function countActiveFilters(filters) {
   if (filters.furnishing) count++;
   if (filters.gated) count++;
   if (filters.postedWithin && filters.postedWithin !== "all") count++;
-  if (filters.showToletBoards) count++;
   if (filters.nearBusRoute) count++;
   return count;
 }

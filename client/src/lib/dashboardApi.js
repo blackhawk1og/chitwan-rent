@@ -38,6 +38,7 @@ export const dashboardApi = {
   getRateLimitLookup: (q) => request(`/rate-limit-lookup?q=${encodeURIComponent(q)}`),
   getHygiene: () => request("/hygiene"),
   getInterests: () => request("/interests"),
+  getToletSpots: () => request("/tolet-spots"),
 
   lookupUser: (q) => request(`/users/lookup?q=${encodeURIComponent(q)}`),
   deleteUser: (id, confirmId) =>
