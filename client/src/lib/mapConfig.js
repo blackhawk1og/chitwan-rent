@@ -5,14 +5,14 @@ export const DEFAULT_ZOOM = 12;
 // `key` query parameter (their documented Leaflet form is
 // `.../{z}/{x}/{y}.png?key=YOUR_KEY`). Keys are per-domain and free up to a
 // fair-use limit, so this is read from the environment rather than committed
-// — see VITE_CARTO_API_KEY in client/.env.example.
+// — see CARTO_API_KEY in client/.env.example.
 //
 // Deliberately optional: as of writing, these tile paths still serve normally
 // with no key at all, so a missing key degrades to exactly today's behaviour
 // (unkeyed requests, subject to CARTO's watermark rollout) instead of leaving
 // a contributor with a blank map. Only the CARTO layers take the key — the
 // satellite layer below is Esri's and is unrelated.
-const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY;
+const CARTO_API_KEY = import.meta.env.CARTO_API_KEY;
 
 function withCartoKey(url) {
   return CARTO_API_KEY ? `${url}?key=${encodeURIComponent(CARTO_API_KEY)}` : url;

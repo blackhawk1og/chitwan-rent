@@ -112,7 +112,7 @@ code.
 
    The client has its own `client/.env.example`, but both of its variables are
    optional: `VITE_API_URL` already defaults to `http://localhost:4000/api`, and
-   `VITE_CARTO_API_KEY` (a free, per-domain [CARTO basemaps
+   `CARTO_API_KEY` (a free, per-domain [CARTO basemaps
    key](https://carto.com/basemaps/apikey/), appended to the map tile URLs)
    simply leaves the tiles unkeyed if unset. You only need a `client/.env` to
    point the client elsewhere or to key the basemap.
