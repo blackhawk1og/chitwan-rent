@@ -48,7 +48,11 @@ active spotters.
   pulled from the map and the owner is notified why.
 - **Spot a To-Let, gamified** — photograph a to-let board you pass, pin its
   location, and climb a public leaderboard (under a nickname, not your real
-  name) as you spot more.
+  name) as you spot more. Board pins render in their own orange layer that
+  reveals once you've zoomed in past the district overview (nearby ones group
+  into a cluster), and tapping one opens the board photo full-width. Anyone
+  can flag a board as gone or wrong — three reports and the pin comes off the
+  map automatically, though the row is kept for moderation review.
 - **Anonymous rent-transparency pins** — drop a pin showing what you actually
   pay (rent, BHK, gated/not, and optionally furnishing and parking), with no
   name or contact info attached. **Note:** this data is currently write-only —
@@ -104,51 +108,32 @@ code.
    | `SENDGRID_API_KEY` | Required for email to send | [SendGrid](https://app.sendgrid.com/settings/api_keys) API key, used to send verification/digest/notification emails. Sends from `chitwanrent@gmail.com`, verified as a SendGrid **Single Sender** (one address, not a full domain) |
    | `DIGEST_REPLY_TO` | Optional | Reply-To address on weekly digest emails |
    | `DASHBOARD_PASSWORD` | Required only for the internal operator dashboard | Shared password gating that one internal-only tool |
+   | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | Required for To-Let board photo uploads | [Cloudinary](https://cloudinary.com) credentials (free tier). To-Let board photos upload here rather than being stored in the database — see [STRUCTURE.md](./STRUCTURE.md)'s "To-Let spot photo storage". Server-side only, never sent to the client |
 
-   The client also has `client/.env.example` (`VITE_API_URL`), but it already
-   defaults to `http://localhost:4000/api` — you only need a `client/.env` if
-   you're pointing the client somewhere else.
+   The client has its own `client/.env.example`, but both of its variables are
+   optional: `VITE_API_URL` already defaults to `http://localhost:4000/api`, and
+   `VITE_CARTO_API_KEY` (a free, per-domain [CARTO basemaps
+   key](https://carto.com/basemaps/apikey/), appended to the map tile URLs)
+   simply leaves the tiles unkeyed if unset. You only need a `client/.env` to
+   point the client elsewhere or to key the basemap.
 
-4. **Apply the base schema, then every migration, in order** — `schema.sql`
-   alone is stale and does not produce the current database shape; every
-   `add-*` migration below has to run after it, in this order, to reach it:
+4. **Apply the base schema, then every migration** — one command:
 
    ```sh
-   npm run db:schema
-
-   cd server
-   node db/add-flat-social-tables.js
-   node db/add-rent-reports-table.js
-   node db/add-poi-tier-column.js
-   node db/add-flat-listing-details.js
-   node db/add-places-table.js
-   node db/add-flats-society-name.js
-   node db/add-flats-is-seed.js
-   node db/add-flat-reports-table.js
-   node db/add-flat-verification.js
-   node db/add-listing-attempts-table.js
-   node db/add-flat-ratings-dimensions.js
-   node db/add-flat-delete-code.js
-   node db/add-delete-attempts-table.js
-   node db/add-flats-description.js
-   node db/add-flatmate-matching.js
-   node db/add-digest-unsubscribe.js
-   node db/add-next-digest-at.js
-   node db/add-users-is-seed.js
-   node db/add-hero-nickname.js
-   node db/add-seeker-pins-archived-at.js
-   node db/add-flats-rent-flagged.js
-   node db/add-rent-reports-furnishing-parking.js
-   node db/add-dashboard-tables.js
-   node db/add-flats-report-removal-email-sent-at.js
-   node db/add-flat-interests-preferences.js
-   node db/add-flat-interests-parking-count.js
-   cd ..
+   npm run db:migrate
    ```
 
-   (Most of these also have an `npm run add:<name> -w server` shortcut — see
-   `server/package.json` — but a handful don't, so running each file directly
-   with `node` works uniformly for all of them.)
+   `schema.sql` alone is stale and does not produce the current database
+   shape; every `add-*.js` migration has to run after it, in the exact order
+   they were originally added, to reach it. `db:migrate`
+   (`server/db/migrate-all.js`) runs `db:schema` followed by all of them in
+   that verified order, so the sequence lives in one place instead of being
+   copy-pasted correctly by hand. Each migration is still individually
+   runnable (`node db/<file>.js`) if you ever need just one.
+
+   > Adding a new migration? Append it to `MIGRATIONS` in
+   > `server/db/migrate-all.js` too, or a from-scratch setup will silently
+   > skip it.
 
 5. **Seed dummy data** (users, flats, seeker pins, to-let spots, bus routes,
    POIs, rent reports) — must run *after* the migrations above, since the seed

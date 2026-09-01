@@ -20,7 +20,8 @@ chitwan-rent/
 ## Root
 
 - **`package.json`** — declares the `client`/`server` workspaces and the top-level
-  `dev`/`db:schema`/`db:seed` scripts that delegate into each workspace.
+  `dev`/`db:schema`/`db:migrate`/`db:seed` scripts that delegate into each
+  workspace. `db:migrate` is the one-command full setup — see `db/` below.
 
 ---
 
@@ -128,7 +129,7 @@ visits).
 | `FlatsLayer.jsx` | Flat listing markers — clustered (`react-leaflet-cluster`), rendered as compact "3BHK · 22K · ★4.0" chips that shrink further at higher zoom (`FLAT_CHIP_ZOOM_SCALE`). Cluster clicks go through `lib/clusterBehavior.js`'s `createClusterClickHandler`, not the library's own default handler — a cluster whose flats sit at (near-)identical coordinates and will never visually separate, even at max zoom, shows `NearbyFlatsModal.jsx` (a plain tap-to-select list) after one zoom-in click, instead of spiderfying overlapping chips apart. |
 | `PlaceLabelsLayer.jsx` | Locality name labels (villages/towns/suburbs/neighbourhoods/hamlets, from the `places` gazetteer) — its own small zoom-tier system (`PLACE_TIER_1_ZOOM`/`PLACE_TIER_2_ZOOM`, deliberately not merged into `poiTiers.js` since places are a different dataset), plus a from-scratch spatial decluttering pass that estimates label/chip/POI-pin widths and drops any label that would overlap an already-kept one or a flat chip/POI pin. Rendered below flat chips and POI pins in z-order. |
 | `SeekersLayer.jsx` | Seeker-pin markers, clustered. *Currently unmounted* — the map-visibility toggle for this layer was removed from the UI, but the component, the underlying data fetch, and the "Drop a Seeker Pin" submission flow are all still fully intact for when it's re-enabled. |
-| `ToletSpotsLayer.jsx` | To-let board photo pins (simple popup with photo + spotter name/message). |
+| `ToletSpotsLayer.jsx` | To-let board pins — orange "To-Let" pills with a calendar glyph and a pointed tail (`createToLetPillIcon`), clustered via `MarkerClusterGroup` exactly like `FlatsLayer` but with a single-line `"<n> TO-LET"` badge. Zoom-gated: nothing renders below `TOLET_SPOTS_MIN_ZOOM` (14, i.e. two steps past the default district view), so the opening map stays clear of them. A pin click goes straight to `ToletSpotDetailCard` — no intermediate `ListingChip` step. See "To-Let spotting" below. |
 | `BusRoutesLayer.jsx` | Renders each bus route as a colored polyline with a name tooltip. |
 | `PoisLayer.jsx` | Schools/colleges. Schools are exempt from the zoom-tier system (always visible) and use a *proportional* "halfway" label-reveal rule (`getHalfwayLabelZoom`); colleges follow the same flat tier system as every other POI category. |
 | `GeneralPoisLayer.jsx` | Restaurants, cafes, hospitals/clinics, pharmacies, temples, landmarks — zoom-tier gated (see `poiTiers.js`), spatially decluttered so dense areas don't overlap, icon+label always render together (no separate label delay). |
@@ -185,11 +186,12 @@ before the `POST /:id/interest` request fires.
 | `FlatDetailPanel.jsx` | Full flat detail slide-over: photo carousel, stats, "I'm interested" CTA, community rating, comments, share/report (opens `ReportReasonModal.jsx`). The largest modal-ish component after `MapShell`. |
 | `ReportReasonModal.jsx` | "Flag this listing?" — an optional written reason (never required; `POST /:id/report` itself treats it as optional too), opened from `FlatDetailPanel`. Copy states the 3-report removal threshold directly to the reporter. |
 | `SeekerDetailCard.jsx` | Seeker profile modal — preferences plus an "I'm interested" CTA (routes through `InterestForm`, gated by auth). |
+| `ToletSpotDetailCard.jsx` | Click-through card for a To-Let pin: header (pin icon + "To-Let spotted" + `formatShortDate`), the board photo full-width, a "as seen on board — verify from the photo above" caption, and Share + "Board gone / wrong" buttons. Deliberately **no call button** — a phone number visible in the photo is never OCR'd or auto-dialed. Owns its own `AuthGateModal` (same self-contained pattern as `FlatDetailPanel`). See "To-Let spotting" below. |
 | `NearbyFlatsModal.jsx` | Plain tap-to-select list of flats shown instead of spiderfying a cluster that will never visually separate (near-identical coordinates) — see `FlatsLayer.jsx`/`lib/clusterBehavior.js` above. |
 | `PhotoCarousel.jsx` | Swipeable photo viewer with dot indicators, used inside `FlatDetailPanel`. |
 | `CommentsSection.jsx` | Comment list + composer for a flat. |
 | `StarRating.jsx` | `StarRatingDisplay` (read-only) and `StarRatingInput` (interactive) widgets. |
-| `FilterModal.jsx` | Full filter panel: available-only, BHK, rent range, neighbourhood, furnishing, gated, posted-within, to-let boards, near-bus-route. |
+| `FilterModal.jsx` | Full filter panel: available-only, BHK, rent range, neighbourhood, furnishing, gated, posted-within, near-bus-route. (There used to be a "Show To-Let boards" toggle here; it was removed — to-let visibility is purely zoom-based now. See "To-Let spotting" below for why.) |
 | `MoreModal.jsx` | "More tools": Locate me, Hide pins, Area stats. |
 | `AreaStatsResultsModal.jsx` | Avg/min/max rent by BHK bucket for the drawn rectangle, via `useAreaStats`. |
 | `HowToUseTour.jsx` | Guided first-visit tour — auto-launches the first time anyone lands on `/` (`isHowToUseTourSeen()`/`localStorage`'s `how-to-use-tour-seen`), also reachable any time via the nav pill row's "How to use" link (`/how-to-use`). Steps spotlight real UI elements by targeting `data-tour="..."` attributes already present on them (`data-tour="search-bar"`/`"nav-pill-row"`/`"spot-to-let"`/etc., set directly on `SearchBar`/`TopNavPill`/`IconStack`) — a step with no selector renders a plain centered card instead of a spotlight. |
@@ -221,6 +223,7 @@ query string. Reads: `useFlats`, `useAreas`, `usePlaces`, `usePois`,
 `useToletSpots`, `useBusRoutes`, `useSeekerPins`, `useSuperheroes`,
 `useFlatComments`, `useNearbyStats`, `useNearbySeekers`, `useAreaStats`. Writes:
 `useCreateFlat`, `useCreateSeekerPin`, `useCreateToletSpot`,
+`useUploadToletPhoto`, `useReportToletSpot`,
 `useCreateRentReport`, `useAddFlatPhotos`, `useRemoveFlatPhoto`, `useRateFlat`,
 `useFlatInterest`, `useCreateFlatComment`, `useReportFlat`.
 
@@ -244,7 +247,7 @@ is handled separately at submit time — see the auth-gating note above).
 
 | File | Purpose |
 |---|---|
-| `api.js` | `fetchJson`/`postJson`/`patchJson`/`deleteJson` — attach the stored JWT as a Bearer header automatically. |
+| `api.js` | `fetchJson`/`postJson`/`patchJson`/`deleteJson` — attach the stored JWT as a Bearer header automatically. Plus `postFormData`, kept separate from `postJson` rather than branching inside it: `postJson` always sets `Content-Type: application/json`, while a `FormData` body needs the browser to set that header itself (with the multipart boundary), which only happens if nothing sets it explicitly. Used only by `useUploadToletPhoto`. |
 | `dashboardApi.js` | Separate client for the internal dashboard — every call sets `credentials: "include"` instead of an Authorization header, since that surface authenticates via a session cookie, not a per-user token. See "Internal dashboard" below. |
 | `mapConfig.js` | Map center/default zoom, tile URLs (dark base + labels overlay, satellite), Chitwan bounding box, Nominatim viewbox string. |
 | `mapIcons.jsx` | Every Leaflet `divIcon` factory in the app (POI pins, flat info chips, cluster badges, the user-location dot, drag handles, "Your Pin" marker, place labels...) — one place all marker HTML/CSS lives. |
@@ -253,7 +256,7 @@ is handled separately at submit time — see the auth-gating note above).
 | `geo.js` | `haversineMeters` + `findNearest` (nearest area-centroid lookup). |
 | `geocode.js` | `reverseGeocodeArea` — Nominatim reverse geocode with a 5s timeout, falling back to the nearest known area centroid so pin-drop flows never block on the network. |
 | `filters.js` | `DEFAULT_FILTERS`, `buildFlatsQueryParams`, `countActiveFilters`. `DEFAULT_FILTERS.availableOnly` is `false` — the map's default fetch sends no `status` filter at all (relevant to the server-side `status != 'rented'` exclusion — see "Rent-cap system"/mark-as-rented note below). |
-| `format.js` | `formatRs`, `formatRsCompact`, `bhkLabel`, `formatRelativeTime`. |
+| `format.js` | `formatRs`, `formatRsCompact`, `bhkLabel`, `formatRelativeTime`, `formatShortDate` ("9 Aug" — en-GB specifically, for its day-before-month order; used by `ToletSpotDetailCard`'s header where "3 days ago" doesn't fit). |
 | `validation.js` | `isValidEmail` (format + typo-detection against common providers via Levenshtein distance), `isValidPhone`/`sanitizePhoneInput` (10-digit numbers). |
 | `authStorage.js` | Reads/writes the session (JWT + user) to `localStorage`. |
 
@@ -489,6 +492,40 @@ No `flats.interest_count` materialized column was added (considered, but
 judged not worth a second write-path to keep in sync at this app's traffic
 size — the dashboard section alone satisfies the visibility gap).
 
+### To-Let spotting
+
+The gamified "spot a board" layer: submit via `SpotToLetModal.jsx`, browse as
+pins via `ToletSpotsLayer.jsx`, open one via `ToletSpotDetailCard.jsx`.
+
+**Visibility is purely zoom-based.** Pins render only at
+`TOLET_SPOTS_MIN_ZOOM` (14) and above — two steps past `DEFAULT_ZOOM` (12) —
+so the opening map is free of them, same "don't clutter the default view"
+reasoning as `poiTiers.js`, just one flat threshold instead of a tier ladder.
+There used to be a `showToletBoards` filter toggle gating this instead, and
+it was removed outright rather than kept alongside the zoom rule: because it
+defaulted to `false` on every load and also gated the *fetch*
+(`useToletSpots(enabled)`), a fresh visit or refresh produced no to-let data
+at all no matter how far you zoomed. That was the actual cause of a
+"pins don't show after refresh" bug — the query was disabled, not the pins
+hidden. `useToletSpots()` now always fetches, and `DEFAULT_FILTERS` has no
+`showToletBoards` key at all.
+
+Nearby pins cluster through `MarkerClusterGroup` the same way flats do, with
+a single-line `"<n> TO-LET"` badge (`createClusterBadgeIcon` collapses to a
+compact one-line layout when no `line2` is passed).
+
+**Reporting and auto-removal.** `POST /api/tolet-spots/:id/report`
+(`requireAuth`) is the "Board gone / wrong" action. Unlike flats' own report
+route it genuinely dedupes per reporter: `tolet_spot_reports` carries a
+`UNIQUE(tolet_spot_id, user_id)` constraint, and the insert is
+`ON CONFLICT DO NOTHING` — whether a row was actually inserted is what
+decides if the count moves, so a repeat report from the same user is a no-op
+(returns `alreadyReported: true`) rather than double-counting. At
+`TOLET_REPORT_REMOVAL_THRESHOLD` (3) the spot flips to `status = 'removed'`;
+`GET /api/tolet-spots` filters `status != 'removed'`, so it leaves the map on
+the next refetch. **Never a `DELETE`** — the row and its report history stay
+for moderation review (surfaced in the dashboard's own To-Let spots section).
+
 ### To-Let spot photo storage
 
 `tolet_spots.photo_url` moved from base64-in-Postgres to Cloudinary. Every
@@ -597,6 +634,18 @@ the real protection (the password itself).
      listings, their seeker pins, their to-let spots, and their own flats
      (whose cascades then clean up ratings/comments/reports/interests on
      those specific flats) before the user row itself.
+  8. **To-Let spots** — two tables, active (`status != 'removed'`) and
+     removed, each showing id / spotted-at / spotter `hero_nickname` / lat /
+     lng / `report_count` / status. The removed table adds an audit column
+     counting actual `tolet_spot_reports` rows, shown *beside* the
+     materialized `report_count` rather than collapsed into it — they should
+     always agree, and a mismatch renders in red because that's exactly what
+     this view exists to catch. **`photo_url` is never selected** by either
+     query (columns are listed explicitly, not `t.*`), so board photos can't
+     surface here even by accident. No seed-vs-real split: `tolet_spots` has
+     no `is_seed` column, and unlike `rent_reports` its rows are *not* all
+     real by construction (`db/seed.js` does create to-let spots), so the
+     section states that gap instead of guessing.
 - **`lib/dashboardApi.js`** (client) — every call uses
   `credentials: "include"` instead of a Bearer header, since this surface
   authenticates via cookie.
@@ -610,10 +659,22 @@ the real protection (the password itself).
   relative to the migrations below** — e.g. it has neither `flats.rent_flagged`
   nor `flats.report_removal_email_sent_at` nor `seeker_pins.archived_at` nor
   `users.is_seed` nor `flat_interests.move_in`/`gender`/`parking_required`/
-  `parking_count`, and doesn't define `dashboard_login_attempts` or
-  `digest_runs` at all. A from-scratch DB needs `db:schema` **followed by
-  every `add:*` migration below**, run in roughly chronological order, to
-  reach the current shape — `schema.sql` alone will not.
+  `parking_count` nor `tolet_spots.report_count`/`status`, and doesn't define
+  `dashboard_login_attempts`, `digest_runs`, or `tolet_spot_reports` at all.
+  A from-scratch DB needs `db:schema` **followed by every `add-*.js` migration
+  below, in order** — `schema.sql` alone will not get there. Don't do that by
+  hand: **`migrate-all.js`** (below) is the one command that does it.
+- **`migrate-all.js`** (`npm run db:migrate`, from the root or `server/`) —
+  runs `db:schema` and then every migration in `MIGRATIONS`, in order,
+  stopping at the first failure. That order is **not** alphabetical and not
+  guessed: it was derived from this repo's real commit history
+  (`git log --reverse --diff-filter=A -- server/db/`), which caught two
+  genuine ordering mistakes in the hand-written list this replaced. Each
+  migration runs as its own child process, so all of them stay individually
+  runnable (`node db/<file>.js`) and none needed editing to be orchestrated.
+  Deliberately does **not** run `db:seed` — seeding is a separate choice.
+  **A new migration has to be appended to `MIGRATIONS` too**, or a
+  from-scratch setup silently skips it.
 - **`seed.js`** — the main dummy-data generator: users, flats, seeker pins,
   to-let spots, rent reports, scattered across the areas in `areasData.js`
   weighted by density. Marks its own rows `is_seed = true` on `flats`,
@@ -642,8 +703,12 @@ the real protection (the password itself).
   runnable scripts — see the callouts below for tables that don't.
 - **Additive migrations** — `CREATE TABLE/COLUMN IF NOT EXISTS`, safe to run
   against a dev DB that already has data; this is the pattern used for every
-  schema change instead of re-running `schema.sql`. In roughly chronological
-  order: `add-flat-social-tables.js`, `add-rent-reports-table.js`,
+  schema change instead of re-running `schema.sql`. **`MIGRATIONS` in
+  `migrate-all.js` is the authoritative run order** — the inventory below is
+  descriptive only and is *not* ordering-accurate (an earlier hand-maintained
+  ordering here was found to be wrong in two places; rather than re-syncing a
+  second copy by hand forever, defer to the code). The full set:
+  `add-flat-social-tables.js`, `add-rent-reports-table.js`,
   `add-poi-tier-column.js`, `add-flat-listing-details.js`,
   `add-places-table.js`, `add-flats-society-name.js`, `add-flats-is-seed.js`,
   `add-flat-reports-table.js`, `add-flat-verification.js`,
@@ -657,7 +722,9 @@ the real protection (the password itself).
   (`dashboard_login_attempts` + `digest_runs`),
   `add-flats-report-removal-email-sent-at.js`,
   `add-flat-interests-preferences.js` (`move_in`/`gender`/`parking_required`),
-  `add-flat-interests-parking-count.js`. `add-flatmate-matching.js` created
+  `add-flat-interests-parking-count.js`,
+  `add-tolet-spot-reports.js` (`tolet_spots.report_count`/`status` plus the
+  `tolet_spot_reports` table — see "To-Let spotting" above). `add-flatmate-matching.js` created
   the `matches` table (see "Weekly match digest" above) and backfilled
   `seeker_pins.is_seed`; `add-digest-unsubscribe.js` added `unsubscribe_token`
   to both `flats` and `seeker_pins`; `add-next-digest-at.js` added
