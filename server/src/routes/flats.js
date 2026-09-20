@@ -1,10 +1,19 @@
 import { Router } from "express";
-import { query } from "../db.js";
+import { query, withTransaction } from "../db.js";
 import { isNearAnyRoute, isWithinChitwanBounds } from "../lib/geo.js";
 import { requireAuth } from "../lib/auth.js";
 import { generateVerificationToken } from "../lib/verification.js";
 import { sendVerificationEmail, sendReportRemovalEmail, sendInterestNotificationEmail } from "../lib/email.js";
 import { checkListingRateLimit, recordListingAttempt } from "../lib/listingRateLimit.js";
+import {
+  checkSubmissionLimit,
+  recordSubmission,
+  checkInterestLimit,
+  userKey,
+  LISTING_USER_WINDOW_HOURS,
+  LISTING_USER_MAX_PER_WINDOW,
+} from "../lib/submissionRateLimit.js";
+import { validatePhotos } from "../lib/photoLimits.js";
 import { verifyFlatDeleteCode } from "../lib/flatCodeVerification.js";
 
 // Mirrors the GET /'s own inline `f.report_count < 3` filter below — that's
@@ -192,7 +201,21 @@ router.post("/", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "Location must be within Chitwan district" });
   }
 
+  // Server-side photo limits — the client's own 6-photo cap is a convenience,
+  // not enforcement (see lib/photoLimits.js). No existingCount here: this is
+  // a brand-new listing, so whatever arrives is the whole set.
+  const photoCheck = validatePhotos(photos);
+  if (!photoCheck.ok) {
+    return res.status(400).json({ error: photoCheck.error });
+  }
+
   try {
+    // Two independent 24h windows, both checked before anything is written.
+    // The email one (listing_attempts, unchanged) is the original rule. The
+    // user one closes the gap it left: `email` is optional on this route, and
+    // omitting it skipped the rate limit entirely while still creating a real
+    // row. Keyed on the token's user id, which a caller can't vary without
+    // going back through /api/auth/login for a new identity.
     if (email) {
       const rateLimit = await checkListingRateLimit(email);
       if (!rateLimit.allowed) {
@@ -201,6 +224,19 @@ router.post("/", requireAuth, async (req, res) => {
           error: `You can only list one flat every 24 hours. Try again in ~${rateLimit.hoursRemaining} ${hourWord}.`,
         });
       }
+    }
+
+    const userRateLimit = await checkSubmissionLimit({
+      kind: "listing",
+      key: userKey(req.userId),
+      windowHours: LISTING_USER_WINDOW_HOURS,
+      max: LISTING_USER_MAX_PER_WINDOW,
+    });
+    if (!userRateLimit.allowed) {
+      const hourWord = userRateLimit.hoursRemaining === 1 ? "hour" : "hours";
+      return res.status(429).json({
+        error: `You can only list one flat every 24 hours. Try again in ~${userRateLimit.hoursRemaining} ${hourWord}.`,
+      });
     }
 
     if (email) {
@@ -251,6 +287,9 @@ router.post("/", requireAuth, async (req, res) => {
       // from flats itself.
       await recordListingAttempt(email);
     }
+    // Always recorded, with or without an email — this is the half of the
+    // limit that an email-less submission can't sidestep.
+    await recordSubmission({ kind: "listing", key: userKey(req.userId) });
 
     if (email) {
       try {
@@ -296,7 +335,18 @@ router.patch("/:id/photos", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "You can only add photos to your own listing" });
     }
 
-    const combined = [...(existing.rows[0].photos ?? []), ...photos].slice(0, 6);
+    // Counted against what the listing already holds, so the 6-photo cap
+    // holds across repeated calls rather than per request. This replaces a
+    // silent `.slice(0, 6)`: an over-limit submission is now refused with a
+    // message saying why, instead of being quietly truncated so the caller
+    // believes photos were stored that weren't.
+    const existingPhotos = existing.rows[0].photos ?? [];
+    const photoCheck = validatePhotos(photos, { existingCount: existingPhotos.length });
+    if (!photoCheck.ok) {
+      return res.status(400).json({ error: photoCheck.error });
+    }
+
+    const combined = [...existingPhotos, ...photos];
     // RETURNING id, photos — not RETURNING *. The row is still
     // pending_verification at the point ListFlatSuccessModal calls this, so a
     // full row echoed back the listing's own verification_token (and later its
@@ -394,10 +444,25 @@ router.post("/:id/rating", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "This listing's rating can't be changed" });
     }
 
-    await query(
-      "INSERT INTO flat_ratings (flat_id, user_id, locality_stars, built_quality_stars) VALUES ($1, $2, $3, $4)",
+    // One rating row per user per flat, enforced by
+    // uniq_flat_ratings_flat_user (db/add-ratings-reports-unique.js). A
+    // repeat submission revises that user's existing stars instead of adding
+    // a second row that would weight their opinion twice in the average
+    // below — rating again is a legitimate thing to do (the listing may have
+    // been visited since), stacking rows is not.
+    const upsert = await query(
+      `INSERT INTO flat_ratings (flat_id, user_id, locality_stars, built_quality_stars)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (flat_id, user_id) DO UPDATE
+         SET locality_stars = EXCLUDED.locality_stars,
+             built_quality_stars = EXCLUDED.built_quality_stars,
+             created_at = now()
+       RETURNING (xmax = 0) AS inserted`,
       [req.params.id, req.userId, localityStars, builtQualityStars]
     );
+    // xmax = 0 is true only for a genuinely new row — the standard way to
+    // tell an upsert's insert branch from its update branch in one statement.
+    const wasInserted = upsert.rows[0].inserted;
     const result = await query(
       `UPDATE flats SET rating = (
          SELECT AVG((locality_stars + built_quality_stars) / 2.0)
@@ -408,7 +473,10 @@ router.post("/:id/rating", requireAuth, async (req, res) => {
        RETURNING rating`,
       [req.params.id]
     );
-    res.status(201).json({ rating: result.rows[0].rating });
+    // 201 for a new rating, 200 for a revision. The client reads only
+    // `rating` off this response (see FlatDetailPanel.jsx), so `updated` is
+    // there for API correctness rather than for any current caller.
+    res.status(wasInserted ? 201 : 200).json({ rating: result.rows[0].rating, updated: !wasInserted });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to submit rating" });
@@ -421,18 +489,52 @@ router.post("/:id/report", requireAuth, async (req, res) => {
   const flatId = req.params.id;
 
   try {
-    await query(
-      "INSERT INTO flat_reports (flat_id, user_id, reason) VALUES ($1, $2, $3)",
-      [flatId, req.userId, reason]
-    );
-    const result = await query(
-      "UPDATE flats SET report_count = report_count + 1 WHERE id = $1 RETURNING report_count",
-      [flatId]
-    );
-    if (result.rows.length === 0) {
+    // One report per user per flat, enforced by uniq_flat_reports_flat_user
+    // (db/add-ratings-reports-unique.js) rather than by trusting the client's
+    // own disabled-button state. Before this, a single account could call
+    // this three times and push any listing past REPORT_REMOVAL_THRESHOLD on
+    // its own. Same ON CONFLICT DO NOTHING + "was a row actually inserted?"
+    // shape routes/toletSpots.js already uses for spot reports.
+    //
+    // The insert and the counter bump run in one transaction: report_count is
+    // materialized, and with the constraint in place a failed bump could no
+    // longer be corrected by re-reporting (the retry would conflict), leaving
+    // the count permanently short of the rows backing it.
+    const { inserted, reportCount } = await withTransaction(async (client) => {
+      const insertResult = await client.query(
+        `INSERT INTO flat_reports (flat_id, user_id, reason)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (flat_id, user_id) DO NOTHING
+         RETURNING id`,
+        [flatId, req.userId, reason]
+      );
+
+      if (insertResult.rows.length === 0) {
+        const existing = await client.query("SELECT report_count FROM flats WHERE id = $1", [flatId]);
+        return { inserted: false, reportCount: existing.rows[0]?.report_count ?? null };
+      }
+
+      // Kept as report_count + 1 rather than a COUNT(*) recount: the
+      // increment takes a row lock, so two concurrent reports from different
+      // users get distinct values and exactly one of them sees the threshold
+      // — a recount could hand the same number to both and send the removal
+      // email twice.
+      const updated = await client.query(
+        "UPDATE flats SET report_count = report_count + 1 WHERE id = $1 RETURNING report_count",
+        [flatId]
+      );
+      return { inserted: true, reportCount: updated.rows[0].report_count };
+    });
+
+    if (reportCount === null) {
       return res.status(404).json({ error: "Flat not found" });
     }
-    const reportCount = result.rows[0].report_count;
+    if (!inserted) {
+      // Already reported by this exact user — idempotent, not an error, and
+      // deliberately not a 429: the report stands, there is simply nothing
+      // more to record. Mirrors toletSpots.js's own repeat-report response.
+      return res.status(200).json({ report_count: reportCount, alreadyReported: true });
+    }
 
     // Fires exactly once, right as this flat crosses into GET /'s
     // report_count filter above — not on every report after that, since the
@@ -504,6 +606,20 @@ router.post("/:id/interest", requireAuth, async (req, res) => {
       : null;
 
   try {
+    // Every accepted submission emails the flat's owner, so without a cap
+    // this route is an email-bombing tool aimed at whichever owner the
+    // caller picks (and a way to burn the SendGrid quota the whole app
+    // shares). One per flat per person per 24h — a genuinely interested
+    // seeker has no reason to submit the same listing twice in a day, and
+    // the owner already has their contact details from the first one.
+    const rateLimit = await checkInterestLimit(req.params.id, req.userId);
+    if (!rateLimit.allowed) {
+      const hourWord = rateLimit.hoursRemaining === 1 ? "hour" : "hours";
+      return res.status(429).json({
+        error: `You've already sent this owner your details — they have them. You can send interest in this listing again in ~${rateLimit.hoursRemaining} ${hourWord}.`,
+      });
+    }
+
     const result = await query(
       `INSERT INTO flat_interests (flat_id, user_id, contact, note, move_in, gender, parking_required, parking_count)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)

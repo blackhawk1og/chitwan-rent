@@ -4,6 +4,13 @@ import { requireAuth } from "../lib/auth.js";
 import { isWithinChitwanBounds } from "../lib/geo.js";
 import { generateUnsubscribeToken } from "../lib/verification.js";
 import { sendSeekerConfirmationEmail } from "../lib/email.js";
+import {
+  checkSubmissionLimit,
+  recordSubmission,
+  emailOrUserKey,
+  SEEKER_PIN_WINDOW_HOURS,
+  SEEKER_PIN_MAX_PER_WINDOW,
+} from "../lib/submissionRateLimit.js";
 
 const router = Router();
 
@@ -86,6 +93,31 @@ router.post("/", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "Location must be within Chitwan district" });
   }
 
+  // Every created pin sends a confirmation email to whatever address was
+  // submitted, with no verification that the submitter owns it — so an
+  // unlimited version of this route is a way to mail arbitrary strangers
+  // from our verified sender and exhaust the shared SendGrid quota. Checked
+  // before any write, so a rejected submission leaves nothing behind.
+  //
+  // 3 per 24h rather than 1: unlike a flat listing, dropping a couple of
+  // pins in a day is legitimate (different areas or budgets), and the
+  // archive-check flow in particular ends in creating a fresh pin. This is a
+  // spam backstop, deliberately above normal use, and it neither replaces
+  // nor interacts with that flow.
+  const rateLimitKey = emailOrUserKey(email, req.userId);
+  const rateLimit = await checkSubmissionLimit({
+    kind: "seeker_pin",
+    key: rateLimitKey,
+    windowHours: SEEKER_PIN_WINDOW_HOURS,
+    max: SEEKER_PIN_MAX_PER_WINDOW,
+  });
+  if (!rateLimit.allowed) {
+    const hourWord = rateLimit.hoursRemaining === 1 ? "hour" : "hours";
+    return res.status(429).json({
+      error: `You can create up to ${SEEKER_PIN_MAX_PER_WINDOW} seeker pins every 24 hours. Try again in ~${rateLimit.hoursRemaining} ${hourWord}.`,
+    });
+  }
+
   try {
     if (email || phone) {
       await query(
@@ -130,6 +162,10 @@ router.post("/", requireAuth, async (req, res) => {
       ]
     );
     const pin = result.rows[0];
+
+    // Recorded after the pin actually exists, so a failed creation doesn't
+    // consume one of the submitter's three. Same key the check above used.
+    await recordSubmission({ kind: "seeker_pin", key: rateLimitKey });
 
     if (email) {
       try {

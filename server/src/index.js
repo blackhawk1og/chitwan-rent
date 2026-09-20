@@ -73,6 +73,21 @@ app.use("/verify-listing", verifyListingRouter);
 // (see lib/email.js, lib/digestJob.js).
 app.use("/unsubscribe", unsubscribeRouter);
 
+// A body over express.json's 10mb limit is rejected by the body parser
+// before any route handler runs, so the photo limits in lib/photoLimits.js
+// never get a chance to produce their own message — and Express's default
+// handler answers with an HTML error page, which every fetch() in this app
+// tries to res.json(). Same reasoning as the explicit multer error handling
+// in routes/toletSpots.js: every error response in this API is JSON.
+// Narrowly matched on body-parser's own error type so nothing else is
+// swallowed, and registered after the routes so it only sees what they threw.
+app.use((err, req, res, next) => {
+  if (err?.type === "entity.too.large") {
+    return res.status(413).json({ error: "Those photos are too large — please add fewer, or smaller ones." });
+  }
+  next(err);
+});
+
 // Fail at boot, not at the first owner who tries to use their delete code.
 // hashDeleteCode (lib/deleteCode.js) is keyed by DELETE_CODE_HMAC_SECRET and
 // has no fallback value on purpose, so without it both issuing a code (at

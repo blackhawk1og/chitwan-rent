@@ -36,6 +36,8 @@
     "add:flat-interests-preferences": "node db/add-flat-interests-preferences.js",
     "add:flat-interests-parking-count": "node db/add-flat-interests-parking-count.js",
     "add:tolet-spot-reports": "node db/add-tolet-spot-reports.js",
+    "add:ratings-reports-unique": "node db/add-ratings-reports-unique.js",
+    "add:submission-attempts-table": "node db/add-submission-attempts-table.js",
     "rotate:flat-secrets": "node db/rotate-compromised-flat-secrets.js"
   },
   "dependencies": {
