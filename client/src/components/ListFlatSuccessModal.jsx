@@ -34,19 +34,33 @@ export default function ListFlatSuccessModal({ flat, onClose }) {
   const [photos, setPhotos] = useState(flat.photos ?? []);
   const [shareText, setShareText] = useState(buildDefaultShareMessage);
   const [copied, setCopied] = useState(false);
+  // Holds the server' own message for a rejected upload (e.g. "Photo 2 is
+  // 4.1MB — each photo must be under 2.0MB."). Previously this UI printed a
+  // fixed "Couldn't add photos" string and threw that message away, so an
+  // over-limit upload gave no clue which photo was wrong or why.
+  const [photoError, setPhotoError] = useState(null);
 
   const remainingSlots = 6 - photos.length;
 
   const handleFilesSelected = async (e) => {
-    const files = Array.from(e.target.files ?? []).slice(0, remainingSlots);
+    // Deliberately NOT sliced to remainingSlots. Trimming the selection here
+    // meant picking 10 photos with 3 slots left silently uploaded 3 and
+    // dropped 7, with a success result and no indication anything was
+    // discarded. The server enforces the real caps (server/src/lib/
+    // photoLimits.js) and rejects the whole batch with a message naming the
+    // limit, which is what the user actually needs to see.
+    const files = Array.from(e.target.files ?? []);
     e.target.value = "";
     if (files.length === 0) return;
+    setPhotoError(null);
     try {
       const dataUrls = await Promise.all(files.map(fileToDataUrl));
       const updated = await addPhotos.mutateAsync(dataUrls);
       setPhotos(updated.photos ?? []);
-    } catch {
-      // error surfaced via addPhotos.isError below
+    } catch (err) {
+      // patchJson throws with the API' own { error } text (see lib/api.js) —
+      // surface it verbatim rather than replacing it with a generic string.
+      setPhotoError(err?.message || "Couldn't add photos — try again.");
     }
   };
 
@@ -149,7 +163,7 @@ export default function ListFlatSuccessModal({ flat, onClose }) {
             {addPhotos.isPending ? "Uploading…" : "+ Add photos"}
           </button>
         )}
-        {addPhotos.isError && <p className="mt-2 text-xs text-red-400">Couldn't add photos — try again.</p>}
+        {photoError && <p className="mt-2 text-xs text-red-400">{photoError}</p>}
       </div>
 
       <div className="mt-5 border-t border-white/10 pt-5">

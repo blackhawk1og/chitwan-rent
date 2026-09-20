@@ -78,7 +78,13 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
   // Covers the full submit span (inline login + interest POST), not just
   // flatInterest's own mutation state — see handleSubmitInterest.
   const [interestSubmitting, setInterestSubmitting] = useState(false);
-  const [interestSubmitError, setInterestSubmitError] = useState(false);
+  // Holds the API's own message, not a boolean. As a boolean this state could
+  // only ever render one hardcoded sentence, so a deliberate, specific
+  // rejection — a 429 from the interest rate limit saying the owner already
+  // has their details — was displayed as 'Something went wrong', which reads
+  // as a server fault and invites the user to retry something that will
+  // keep failing.
+  const [interestSubmitError, setInterestSubmitError] = useState(null);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportSubmitError, setReportSubmitError] = useState(false);
   const [localRating, setLocalRating] = useState(null);
@@ -193,7 +199,7 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
   // token is ready before flatInterest's requireAuth'd POST fires.
   const handleSubmitInterest = async (form) => {
     setInterestSubmitting(true);
-    setInterestSubmitError(false);
+    setInterestSubmitError(null);
     try {
       await login({ email: form.email, phone: form.phone });
       // "name" removed from InterestForm.jsx — nothing here substitutes for
@@ -211,8 +217,12 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
       });
       setInterestFormOpen(false);
       setInterestSent(true);
-    } catch {
-      setInterestSubmitError(true);
+    } catch (err) {
+      // postJson throws with the API's { error } text (see lib/api.js), which
+      // for a rate-limited submission already says exactly what happened and
+      // when they can try again. Only fall back to the generic line when
+      // there genuinely is no message (network failure, etc.).
+      setInterestSubmitError(err?.message || "Something went wrong — please try again.");
     } finally {
       setInterestSubmitting(false);
     }
@@ -453,7 +463,7 @@ export default function FlatDetailPanel({ flat, onClose, onSeeAvailable }) {
           onCancel={() => setInterestFormOpen(false)}
           onSubmit={handleSubmitInterest}
           submitting={interestSubmitting}
-          submitError={interestSubmitError ? "Something went wrong — please try again." : null}
+          submitError={interestSubmitError}
         />
       )}
 
