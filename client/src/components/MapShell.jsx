@@ -331,9 +331,23 @@ export default function MapShell() {
     listFlatFlow.step === "pin-drop" || findFlatFlow.step === "pin-drop" || toletPicking || areaStatsDrawing;
 
   const displayedFlats = useMemo(() => {
-    if (!justSubmittedFlats.length) return flats;
+    // Only merge in listings that are actually live. POST /api/flats returns
+    // the new flat as status 'pending_verification' (it goes live only once
+    // the owner clicks the emailed link), and merging that row in made it
+    // render as an ordinary flat pin: tappable, expandable into
+    // FlatDetailPanel, and showing the "I'm interested" CTA — so a listing
+    // the public map is meant to hide could take real interest submissions
+    // and email its owner. GET /api/flats never returns pending rows, so
+    // this local merge was the only way one could appear.
+    //
+    // The owner still sees their pin during the post-submit steps: that's a
+    // separate, dedicated "Your Pin" marker (createYourPinIcon, rendered
+    // while listFlatPostStep is set), not this list. Once verified, the flat
+    // arrives through the normal fetch like any other.
+    const liveSubmitted = justSubmittedFlats.filter((f) => f.status === "available");
+    if (!liveSubmitted.length) return flats;
     const existingIds = new Set(flats.map((f) => f.id));
-    return [...flats, ...justSubmittedFlats.filter((f) => !existingIds.has(f.id))];
+    return [...flats, ...liveSubmitted.filter((f) => !existingIds.has(f.id))];
   }, [flats, justSubmittedFlats]);
 
   const displayedToletSpots = useMemo(() => {

@@ -56,6 +56,44 @@ const router = Router();
 // no "all but these" form — a new sensitive column added later is therefore
 // invisible here until someone deliberately adds it, which is the safe default.
 // owner_name is kept: it's the only users column these endpoints still expose.
+// Single source of truth for "may this flat be interacted with at all?",
+// shared by the four member-action routes below (rating, report, comments,
+// interest). Each of them used to answer that question differently, or not
+// at all: interest and comments accepted any id outright, report never
+// looked, and rating checked only existence — so a listing still sitting in
+// pending_verification (invisible on the public map by design, see GET /'s
+// own filters) could be rated, reported, commented on, and could have
+// interest submitted against it, which emailed its owner.
+//
+// 'available' is the only status that counts as live: pending_verification
+// hasn't been confirmed by its owner yet, and rented is already off the map.
+// The 404 is deliberate and matches GET /:id — an unverified listing should
+// be indistinguishable from one that doesn't exist, so this must never
+// answer "exists but forbidden".
+//
+// The id is validated as a positive integer before it reaches SQL: flats.id
+// is a SERIAL, so a non-numeric id is simply not a flat, and letting it
+// through produced a Postgres 22P02 cast error and a 500 instead of the 404
+// it should have been.
+//
+// Returns { ok: true, flat } or { ok: false, status, error } — the same
+// shape lib/flatCodeVerification.js already uses, so callers forward
+// status/error straight into their own res.status().json() and stop.
+// `flat` carries is_seed so the rating route can keep its own extra rule
+// without a second round trip.
+async function checkFlatIsLive(flatId) {
+  const numericId = Number(flatId);
+  if (!Number.isInteger(numericId) || numericId < 1) {
+    return { ok: false, status: 404, error: "Flat not found" };
+  }
+
+  const result = await query("SELECT id, status, is_seed FROM flats WHERE id = $1", [numericId]);
+  if (result.rows.length === 0 || result.rows[0].status !== "available") {
+    return { ok: false, status: 404, error: "Flat not found" };
+  }
+  return { ok: true, flat: result.rows[0] };
+}
+
 const SELECT_WITH_OWNER = `
   SELECT
     f.id, f.owner_id, f.listing_type, f.bhk, f.rent, f.deposit, f.furnishing,
@@ -410,6 +448,15 @@ router.post("/:id/comments", requireAuth, async (req, res) => {
   if (!text) return res.status(400).json({ error: "Comment text is required" });
 
   try {
+    // Must be a live listing — see checkFlatIsLive. This route previously
+    // had no check of any kind: it leaned on flat_comments' foreign key, so
+    // an unknown id surfaced as a 500 rather than a 404, and a comment could
+    // be posted to a listing nobody is allowed to see yet.
+    const flatCheck = await checkFlatIsLive(req.params.id);
+    if (!flatCheck.ok) {
+      return res.status(flatCheck.status).json({ error: flatCheck.error });
+    }
+
     const result = await query(
       `INSERT INTO flat_comments (flat_id, user_id, name, text)
        SELECT $1, u.id, u.name, $2 FROM users u WHERE u.id = $3
@@ -433,14 +480,18 @@ router.post("/:id/rating", requireAuth, async (req, res) => {
   }
 
   try {
+    // Must be a live listing — see checkFlatIsLive. This replaces a local
+    // existence-only lookup that let a pending_verification or rented flat
+    // be rated.
+    const flatCheck = await checkFlatIsLive(req.params.id);
+    if (!flatCheck.ok) {
+      return res.status(flatCheck.status).json({ error: flatCheck.error });
+    }
     // Seed/dummy listings keep their fixed placeholder rating forever — the
     // client never shows them the rating button, but guard it here too
-    // rather than trusting that alone.
-    const flatCheck = await query("SELECT is_seed FROM flats WHERE id = $1", [req.params.id]);
-    if (flatCheck.rows.length === 0) {
-      return res.status(404).json({ error: "Flat not found" });
-    }
-    if (flatCheck.rows[0].is_seed) {
+    // rather than trusting that alone. Distinct from the liveness check
+    // above: a seed flat IS 'available', it just isn't rateable.
+    if (flatCheck.flat.is_seed) {
       return res.status(400).json({ error: "This listing's rating can't be changed" });
     }
 
@@ -489,6 +540,15 @@ router.post("/:id/report", requireAuth, async (req, res) => {
   const flatId = req.params.id;
 
   try {
+    // Must be a live listing — see checkFlatIsLive. A pending listing isn't
+    // on the map for anyone to object to, and reporting it could still have
+    // driven report_count to the removal threshold and emailed its owner
+    // that their listing was taken down.
+    const flatCheck = await checkFlatIsLive(flatId);
+    if (!flatCheck.ok) {
+      return res.status(flatCheck.status).json({ error: flatCheck.error });
+    }
+
     // One report per user per flat, enforced by uniq_flat_reports_flat_user
     // (db/add-ratings-reports-unique.js) rather than by trusting the client's
     // own disabled-button state. Before this, a single account could call
@@ -606,6 +666,15 @@ router.post("/:id/interest", requireAuth, async (req, res) => {
       : null;
 
   try {
+    // Must be a live listing — see checkFlatIsLive. Checked FIRST, before
+    // the rate limit and before any write, because an accepted submission
+    // here emails the owner: this route used to take the flat id on trust,
+    // so interest in a still-unverified listing reached its owner's inbox.
+    const flatCheck = await checkFlatIsLive(req.params.id);
+    if (!flatCheck.ok) {
+      return res.status(flatCheck.status).json({ error: flatCheck.error });
+    }
+
     // Every accepted submission emails the flat's owner, so without a cap
     // this route is an email-bombing tool aimed at whichever owner the
     // caller picks (and a way to burn the SendGrid quota the whole app
