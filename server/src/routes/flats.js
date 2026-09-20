@@ -33,8 +33,29 @@ const SERVER_BASE_URL = process.env.SERVER_BASE_URL || `http://localhost:${proce
 
 const router = Router();
 
+// Explicit column list, never f.* — this query feeds the two PUBLIC reads
+// below (the map's list fetch and the detail fetch), and f.* was handing every
+// caller four secrets plus the owner's contact details:
+//   - unsubscribe_token   -> GET /unsubscribe?token=... hard-deletes the listing
+//   - delete_code_hash    -> offline-crackable, then /flatstatus accepts the code
+//   - verification_token / verification_token_expires_at -> self-verify a listing
+//     without ever receiving the email
+//   - owner_email / owner_phone -> every owner's contact, bulk-scrapable; no
+//     client code reads them from these endpoints (the internal dashboard has
+//     its own query in routes/dashboard.js that selects owner_email itself)
+// Columns are listed one-by-one rather than excluded from f.*, because SQL has
+// no "all but these" form — a new sensitive column added later is therefore
+// invisible here until someone deliberately adds it, which is the safe default.
+// owner_name is kept: it's the only users column these endpoints still expose.
 const SELECT_WITH_OWNER = `
-  SELECT f.*, u.name AS owner_name, u.phone AS owner_phone, u.email AS owner_email
+  SELECT
+    f.id, f.owner_id, f.listing_type, f.bhk, f.rent, f.deposit, f.furnishing,
+    f.includes_maintenance, f.gated, f.who_lives, f.pets_allowed, f.parking_for,
+    f.sqft, f.rating, f.one_liner, f.status, f.lat, f.lng, f.area, f.society_name,
+    f.photos, f.available_from, f.flatmate_gender_pref, f.food_pref, f.smoker_ok,
+    f.posted_at, f.is_seed, f.report_count, f.rent_flagged, f.email_verified_at,
+    f.description, f.next_digest_at, f.report_removal_email_sent_at,
+    u.name AS owner_name
   FROM flats f
   LEFT JOIN users u ON u.id = f.owner_id
 `;
@@ -276,7 +297,13 @@ router.patch("/:id/photos", requireAuth, async (req, res) => {
     }
 
     const combined = [...(existing.rows[0].photos ?? []), ...photos].slice(0, 6);
-    const result = await query("UPDATE flats SET photos = $1 WHERE id = $2 RETURNING *", [combined, req.params.id]);
+    // RETURNING id, photos — not RETURNING *. The row is still
+    // pending_verification at the point ListFlatSuccessModal calls this, so a
+    // full row echoed back the listing's own verification_token (and later its
+    // unsubscribe_token / delete_code_hash), which let the submitter verify
+    // their listing without ever opening the email. The client only reads
+    // .photos off this response (see hooks/useAddFlatPhotos.js).
+    const result = await query("UPDATE flats SET photos = $1 WHERE id = $2 RETURNING id, photos", [combined, req.params.id]);
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -303,7 +330,9 @@ router.delete("/:id/photos", requireAuth, async (req, res) => {
     }
 
     const updated = (existing.rows[0].photos ?? []).filter((p) => p !== url);
-    const result = await query("UPDATE flats SET photos = $1 WHERE id = $2 RETURNING *", [updated, req.params.id]);
+    // RETURNING id, photos, same reasoning as the PATCH above — the client
+    // only reads .photos (see hooks/useRemoveFlatPhoto.js).
+    const result = await query("UPDATE flats SET photos = $1 WHERE id = $2 RETURNING id, photos", [updated, req.params.id]);
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);

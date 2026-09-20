@@ -35,7 +35,8 @@
     "add:flats-report-removal-email-sent-at": "node db/add-flats-report-removal-email-sent-at.js",
     "add:flat-interests-preferences": "node db/add-flat-interests-preferences.js",
     "add:flat-interests-parking-count": "node db/add-flat-interests-parking-count.js",
-    "add:tolet-spot-reports": "node db/add-tolet-spot-reports.js"
+    "add:tolet-spot-reports": "node db/add-tolet-spot-reports.js",
+    "rotate:flat-secrets": "node db/rotate-compromised-flat-secrets.js"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.6",

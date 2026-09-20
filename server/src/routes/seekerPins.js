@@ -7,13 +7,31 @@ import { sendSeekerConfirmationEmail } from "../lib/email.js";
 
 const router = Router();
 
+// Explicit column list, never SELECT * — every read below is public (no
+// requireAuth), and SELECT * was publishing:
+//   - unsubscribe_token -> GET /unsubscribe?token=... hard-deletes that pin
+//   - email / phone     -> every seeker's contact details, for all pins at
+//     once, to anyone who called the endpoint
+// SeekerDetailCard's "Reveal contact" button was never a server-side gate: it
+// only hid values the browser had already downloaded in this payload. With
+// these columns gone it renders its existing "Phone/Email not available"
+// fallback. Restoring the feature needs a separate, access-controlled contact
+// endpoint — deliberately NOT added in this pass (see the handover notes).
+// Listed one-by-one rather than excluded from *, so a sensitive column added
+// later stays out of these responses until someone adds it on purpose.
+const SEEKER_PUBLIC_COLUMNS = `
+  id, user_id, looking_for, budget, bhk_pref, move_in, food_pref, smoker_ok,
+  gender, flatmate_gender_pref, parking_required, lifestyle_note, lat, lng,
+  area, created_at, is_seed, next_digest_at, archived_at
+`;
+
 // GET /api/seeker-pins — active pins only (archived_at IS NULL). This feeds
 // the map layer; an archived pin is meant to disappear from the map, not
 // just stop matching, so it's excluded here the same way it's excluded from
 // digestJob.js's ACTIVE_SEEKERS_SQL.
 router.get("/", async (req, res) => {
   try {
-    const result = await query("SELECT * FROM seeker_pins WHERE archived_at IS NULL ORDER BY created_at DESC");
+    const result = await query(`SELECT ${SEEKER_PUBLIC_COLUMNS} FROM seeker_pins WHERE archived_at IS NULL ORDER BY created_at DESC`);
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -34,7 +52,7 @@ router.get("/by-email", async (req, res) => {
 
   try {
     const result = await query(
-      "SELECT * FROM seeker_pins WHERE email = $1 ORDER BY created_at DESC",
+      `SELECT ${SEEKER_PUBLIC_COLUMNS} FROM seeker_pins WHERE email = $1 ORDER BY created_at DESC`,
       [email]
     );
     res.json(result.rows);
@@ -46,7 +64,7 @@ router.get("/by-email", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   try {
-    const result = await query("SELECT * FROM seeker_pins WHERE id = $1", [req.params.id]);
+    const result = await query(`SELECT ${SEEKER_PUBLIC_COLUMNS} FROM seeker_pins WHERE id = $1`, [req.params.id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Seeker pin not found" });
     }

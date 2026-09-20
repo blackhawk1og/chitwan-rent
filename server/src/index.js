@@ -17,6 +17,7 @@ import unsubscribeRouter from "./routes/unsubscribe.js";
 import dashboardRouter from "./routes/dashboard.js";
 import { startExpiredListingsCleanup } from "./lib/cleanupExpiredListings.js";
 import { startDigestJob } from "./lib/digestJob.js";
+import { assertDeleteCodeSecret } from "./lib/deleteCode.js";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -71,6 +72,19 @@ app.use("/verify-listing", verifyListingRouter);
 // Same reasoning — the literal link clicked from a weekly digest email
 // (see lib/email.js, lib/digestJob.js).
 app.use("/unsubscribe", unsubscribeRouter);
+
+// Fail at boot, not at the first owner who tries to use their delete code.
+// hashDeleteCode (lib/deleteCode.js) is keyed by DELETE_CODE_HMAC_SECRET and
+// has no fallback value on purpose, so without it both issuing a code (at
+// verification time) and checking one would throw mid-request. Exiting here
+// means a deploy that forgot the env var fails its health check and the
+// previous deploy keeps serving, rather than this one running half-broken.
+try {
+  assertDeleteCodeSecret();
+} catch (err) {
+  console.error(err.message);
+  process.exit(1);
+}
 
 app.listen(PORT, () => {
   console.log(`API server listening on http://localhost:${PORT}`);
