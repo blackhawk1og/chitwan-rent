@@ -42,6 +42,20 @@ async function sendMail({ to, subject, html, replyTo }) {
 
 const BRAND_PURPLE = "#7c3aed";
 
+// Origin of the FRONTEND, for links that point at a page in the SPA rather
+// than at this API — contrast SERVER_BASE_URL (routes/flats.js,
+// lib/digestJob.js), which is this server's own origin and is right for
+// /verify-listing and /unsubscribe because those are routes on the API
+// itself. /flatstatus is a React route (see client's App.jsx), so it lives
+// on the client's origin instead.
+//
+// Read from CLIENT_ORIGIN, which already has to be set to exactly this in
+// any real deployment (index.js locks CORS to it). The fallback is the
+// production deployment rather than a localhost guess, so a deploy that
+// forgot the variable still emails a link that actually works. Trailing
+// slashes are stripped so the join below can't produce "//flatstatus".
+const CLIENT_BASE_URL = (process.env.CLIENT_ORIGIN || "https://chitwan-rent.vercel.app").replace(/\/+$/, "");
+
 function verificationEmailHtml(verifyUrl) {
   return `<!doctype html>
 <html>
@@ -193,7 +207,7 @@ function deleteCodeEmailHtml({ flatId, code }) {
                 <p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:#374151;">
                   Your flat listing (ID <strong>${flatId}</strong>) is now verified and live. Keep this code —
                   it's what you'll need to mark it as rented or remove it later, at
-                  <strong>chitwan.rent/flatstatus</strong>.
+                  <a href="${CLIENT_BASE_URL}/flatstatus" style="color:${BRAND_PURPLE};font-weight:700;text-decoration:underline;">${CLIENT_BASE_URL}/flatstatus</a>.
                 </p>
 
                 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 20px;">
